@@ -1,6 +1,10 @@
 import os
 
+from collections import namedtuple
 from subprocess import Popen, PIPE
+from uuid import uuid4
+
+import config
 
 class cd:
     """Context manager for changing the current working directory"""
@@ -13,6 +17,27 @@ class cd:
 
     def __exit__(self, etype, value, traceback):
         os.chdir(self.saved_path)
+
+
+def check_project_created(project_folder: str) -> None:
+    project_id_path = project_folder / "ray-project" / "project-id"
+    if not project_id_path.exists():
+        raise Exception(
+            f"{project_folder} project hasn't been created.\n"
+            f"You should create a project using anyscale init inside the"
+            f"project folder."
+        )
+
+
+def check_test_type_exist(test_type: str) -> None:
+    assert test_type in config.release_tests, (
+        f"Project type {test_type} doesn't exist. " 
+        f"Existing projects: {config.release_tests}"
+    )
+
+
+def get_test_dir(test_type: str) -> str:
+    return config.RELEASE_TEST_DIR / test_type
 
 
 def run_subprocess(command: list, print_output: bool = True):
@@ -42,46 +67,28 @@ def run_subprocess(command: list, print_output: bool = True):
     return output, error, return_code
 
 
-def parse_cluster_status(output, session_name):
-    # This function is temporary.
-    entries = output.split("\n")
-    table_head_index = None
-    for i, entry in enumerate(entries):
-        entry = entries[i]
-        if entry.strip().startswith("ACTIVE"):
-            table_head_index = i
+class SessionNameBuilder:
 
-    if not table_head_index:
-        raise Exception(
-            "Failed to parse table head properly. "
-            "It is mostly because `anyscale list sessions --all` "
-            "output table format has been changed. Please rewrite "
-            "the parsing logic at parse_cluster_status util function."
-        )
-    # At least table head and one session should exist in entries.
-    assert len(entries) >= 2
-    entries = entries[table_head_index:]
-    table_head = entries[0]
-    table_rows = entries[1:]
-    # This is hacky because each table row is returned as a string.
-    # We use the fact that each components will be always aligned with
-    # the table head components. For example, if STATUS head starts from an index
-    # 3, table row for STATUS will also starts from 3.
-    status_start_index = table_head.find("STATUS")
-    session_start_index = table_head.find("SESSION")
-    created_start_index = table_head.find("CREATED")
+    Session_info = namedtuple(
+    "session_info",
+    ["test_type", "version", "commit", "branch", "session_id"])
 
-    for entry in table_rows:
-        active = entry[0].strip()
-        status = entry[status_start_index:session_start_index].strip(' ')
-        session_name_from_entry = entry[session_start_index:created_start_index].strip(' ')
-        if session_name_from_entry == session_name:
-            if status == "None":
-                status = None
-            active = True if active == "Y" else False
-            return active, status
-    assert False, (
-        f"We could not find the session name {session_name} "
-        "from from anyscale list sessions --all output. Please make sure"
-        "You specified the correct session name that is in the project."
-    )
+    @classmethod
+    def build_session_name(cls, test_type, version, commit, branch, session_id):
+        return (
+            f"{test_type}_" # Underscore is used to label this test with test_name.
+            f"{version}_"
+            f"{commit}_"
+            f"{branch}_"
+            f"{str(uuid4()) if session_id is None else session_id}")
+
+    @classmethod
+    def parse_session_name(cls, session_name):
+        # Note the session name has to be built by `build_session_name` classmethod
+        test_type, version, commit, branch, session_id = session_name.split("_")
+        return cls.Session_info(
+            test_type=test_type,
+            version=version,
+            commit=commit,
+            branch=branch,
+            session_id=session_id)

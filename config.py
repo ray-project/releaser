@@ -3,16 +3,27 @@ import typing
 
 from pathlib import Path
 
-REPO_NAME = "ray-project/ray"
+import release_tests as rt
 
-# Project Type
+from context import Context
+
+# -- Github --
+REPO_NAME = "ray-project/ray"
+MASTER_BRANCH = "master"
+NIGHTLY_VERSION = "0.9.0.dev0"
+
+# -- Release tests --
+RELEASE_TEST_DIR = Path(__file__).cwd() / "release_tests"
+TEMP_DIR = "/tmp/releaser"
+
+# -- Microbenchark --
 MICROBENCHMARK = "microbenchmark"
 
-test_type_dir = Path(__file__).cwd() / "test_type"
-MICROBENCHMARK_DIR = test_type_dir / "microbenchmark"
+release_tests = [
+    MICROBENCHMARK
+]
 
-def get_config_path(test_type: str) -> str:
-    if test_type == MICROBENCHMARK:
-        return MICROBENCHMARK_DIR
-    else:
-        raise Exception("Wrong test type is given.")
+
+def get_test_controller(context: Context):
+    if context.test_type == MICROBENCHMARK:
+        return rt.MicrobenchmarkTestController(context)
