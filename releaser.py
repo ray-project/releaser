@@ -1,11 +1,12 @@
+from typing import List
+
 import click
 
-import config
-import release_tests
+import api
+from release_tests import registry
 
 from context import Context
 from runner import Runner
-from updater import PostProcessor, SlackBot, S3Updater
 
 @click.group()
 def cli():
@@ -17,7 +18,7 @@ def cli():
 @click.option(
     "--test-type",
     required=True,
-    type=click.Choice(config.release_tests),
+    type=click.Choice(registry.release_tests),
 )
 @click.option(
     "--session-name",
@@ -32,14 +33,14 @@ def cli():
     type=bool
 )
 def stop(test_type: str, session_name: str, terminate: bool):
-    PostProcessor.stop(test_type, session_name, terminate=terminate)
+    api.stop(test_type, session_name, terminate)
 
 
 @cli.command()
 @click.option(
     "--test-type",
     required=True,
-    type=click.Choice(config.release_tests),
+    type=click.Choice(registry.release_tests),
 )
 @click.option(
     "--session-name",
@@ -47,9 +48,36 @@ def stop(test_type: str, session_name: str, terminate: bool):
     type=str
 )
 def update(test_type: str, session_name: str):
-    slackbot = SlackBot()
-    s3_updater = S3Updater(test_type)
-    PostProcessor(test_type, slackbot, s3_updater).update(session_name)
+    api.update(test_type, session_name)
+
+
+@cli.command()
+@click.option(
+    "--test-type",
+    required=False,
+    default=None,
+    type=click.Choice(registry.release_tests),
+)
+@click.option(
+    "--all",
+    required=False,
+    default=False,
+    is_flag=True,
+    type=bool
+)
+def cleanup(test_type: str, all: bool):
+    api.cleanup(test_type, all)
+
+
+@cli.command()
+@click.option(
+    "--test-type",
+    required=False,
+    default=None,
+    type=click.Choice(registry.release_tests),
+)
+def kill_old_sessions(test_type: str):
+    api.force_terminate_old_sessions(test_type)
 
 
 # -- Command Runner CLI --
@@ -87,12 +115,10 @@ def microbenchmark(session_id: str,
                    ray_version: str,
                    commit: str,
                    ray_branch: str):
-    context = Context(
-        test_type=config.MICROBENCHMARK,
-        version=ray_version, commit=commit,
-        branch=ray_branch, session_id=session_id)
-    runner = Runner(context)
-    runner.run()
+    api.run_microbenchmark(session_id=session_id,
+                           ray_versionray_version,
+                           commit=commit,
+                           ray_branch=ray_branch)
 
 
 if __name__ == "__main__":

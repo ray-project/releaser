@@ -1,5 +1,8 @@
+ray[debug]
 click
 anyscale
 slackclient
 boto3
 PyGithub
+pydantic
+pyyaml

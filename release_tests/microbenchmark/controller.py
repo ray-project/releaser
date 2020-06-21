@@ -1,9 +1,6 @@
 import os
 
 from dataclasses import dataclass
-from pathlib import Path
-
-import config
 
 from controller import TestController
 from context import Context
@@ -48,13 +45,4 @@ class MicrobenchmarkTestController(TestController):
             f"*Result*\n"
             f"{results}")
         return result_string
-
-    def write_result(self, result: str) -> None:
-        temp_dir = Path(config.TEMP_DIR)
-        temp_dir.mkdir(exist_ok=True)
-
-        file_path = temp_dir / f"{self.context.test_type}.txt"
-        with open(file_path, "w") as file:
-            file.write(result)
-        return file_path
 

@@ -2,7 +2,6 @@ import time
 
 from dataclasses import dataclass
 
-import config
 import release_tests
 
 from context import Context
@@ -12,7 +11,6 @@ from util import (
     cd,
     run_subprocess,
     check_project_created,
-    check_test_type_exist,
     get_test_dir
 )
 
@@ -22,7 +20,7 @@ class Runner:
         # Context of this release test.
         self.context = context
         # The release test controller.
-        self.test_controller: TestController = config.get_test_controller(context)
+        self.test_controller: TestController = release_tests.registry.get_test_controller(context)
         # The folder in which release tests are defined.
         self.test_folder = get_test_dir(self.context.test_type)
 

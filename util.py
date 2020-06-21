@@ -1,10 +1,11 @@
 import os
 
 from collections import namedtuple
+from datetime import datetime
 from subprocess import Popen, PIPE
 from uuid import uuid4
 
-import config
+import constant
 
 class cd:
     """Context manager for changing the current working directory"""
@@ -29,15 +30,8 @@ def check_project_created(project_folder: str) -> None:
         )
 
 
-def check_test_type_exist(test_type: str) -> None:
-    assert test_type in config.release_tests, (
-        f"Project type {test_type} doesn't exist. " 
-        f"Existing projects: {config.release_tests}"
-    )
-
-
 def get_test_dir(test_type: str) -> str:
-    return config.RELEASE_TEST_DIR / test_type
+    return constant.RELEASE_TEST_DIR / test_type
 
 
 def run_subprocess(command: list, print_output: bool = True):
@@ -92,3 +86,8 @@ class SessionNameBuilder:
             commit=commit,
             branch=branch,
             session_id=session_id)
+
+
+def get_current_time():
+    now = datetime.now()
+    return now.strftime("%m-%d-%Y-%H:%M:%S")

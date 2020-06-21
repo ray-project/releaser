@@ -3,7 +3,6 @@ import os
 import time
 import traceback
 
-from datetime import datetime
 from pathlib import Path
 
 import boto3
@@ -13,22 +12,28 @@ from botocore.exceptions import ClientError
 from slack import WebClient
 from slack.errors import SlackApiError
 
-import config
+import constant
 
+from release_tests import registry
 from controller import TestController
 from context import Context
 from util import SessionNameBuilder
-from util import cd, run_subprocess, check_test_type_exist, check_project_created, get_test_dir
+from util import (
+    cd,
+    run_subprocess,
+    check_project_created,
+    get_test_dir,
+    get_current_time)
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__file__)
 
 SLACK_BOT_TOKEN = os.environ['SLACK_BOT_TOKEN']
-CHANNEL = "#bot-release-test"
 
 class SlackBot:
-    def __init__(self):
+    def __init__(self, channel=constant.DEFAULT_SLACK_CHANNEL):
         self.client = WebClient(token=SLACK_BOT_TOKEN)
+        self.channel = channel
 
     def send_message(self, text):
         try:
@@ -46,7 +51,6 @@ class SlackBot:
 
 class S3Updater:
     def __init__(self, test_type):
-        check_test_type_exist(test_type)
         self.s3 = boto3.client("s3")
         self.test_type = test_type
         self.bucket = "release-pipeline-result"
@@ -80,9 +84,7 @@ class S3Updater:
 
 
 class PostProcessor:
-
     def __init__(self, test_type, slackbot: SlackBot, s3_updater: S3Updater):
-        check_test_type_exist(test_type)
         self.test_dir = get_test_dir(test_type)
         self.test_type = test_type
         self.slackbot = slackbot
@@ -92,14 +94,14 @@ class PostProcessor:
         # Get the context from the session name
         session_info = SessionNameBuilder.parse_session_name(session_name)
         context = self._get_context_from_session_info(session_info)
-        controller: TestController = config.get_test_controller(context)
+        controller: TestController = registry.get_test_controller(context)
 
         # Download logs and parses it.
         log_output = self.download_logs(context.test_type, session_name)
         results = controller.process_logs(log_output.split("\n"))
 
         # Update it through the slackbot.
-        current_time = self._get_current_time()
+        current_time = get_current_time()
         result_string = controller.generate_slackbot_message(results, current_time)
 
         # Update it to S3.
@@ -115,10 +117,6 @@ class PostProcessor:
                 print_output=False)
         return output
 
-    def _get_current_time(self):
-        now = datetime.now()
-        return now.strftime("%m-%d-%Y-%H:%M:%S")
-
     def _get_context_from_session_info(self, session_info: SessionNameBuilder.Session_info) -> Context:
         return Context(
             version=session_info.version,
@@ -127,10 +125,8 @@ class PostProcessor:
             session_id=session_info.session_id,
             test_type=session_info.test_type)
 
-
     @classmethod
     def stop(cls, test_type: str, session_name: str, terminate: bool = False):
-        check_test_type_exist(test_type)
         test_dir = get_test_dir(test_type)
         check_project_created(test_dir)
 
