@@ -97,8 +97,13 @@ class Scheduler:
 
     def run(self):
         while True:
-            self.process()
-            time.sleep(60)
+            try:
+                self.process()
+            except as e:
+                print(f"Error occured while processing: {e}")
+                print(traceback.format_exc())
+            finally:
+                time.sleep(60)
 
     def _run_release_test(self, test_config: ReleaseTestConfig):
         """Modify this function to add a new test."""
