@@ -19,7 +19,6 @@ def run_microbenchmark(session_id: str = None,
         test_type=registry.MICROBENCHMARK,
         version=ray_version, commit=commit,
         branch=ray_branch, session_id=session_id)
-    print(context)
     runner = Runner(context)
     runner.run()
 

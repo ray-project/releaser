@@ -101,6 +101,7 @@ class Scheduler:
             time.sleep(60)
 
     def _run_release_test(self, test_config: ReleaseTestConfig):
+        """Modify this function to add a new test."""
         if test_config.test_type == registry.MICROBENCHMARK:
             api.run_microbenchmark(**test_config.kwargs)
 
