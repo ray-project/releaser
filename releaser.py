@@ -116,7 +116,7 @@ def microbenchmark(session_id: str,
                    commit: str,
                    ray_branch: str):
     api.run_microbenchmark(session_id=session_id,
-                           ray_versionray_version,
+                           ray_version=ray_version,
                            commit=commit,
                            ray_branch=ray_branch)
 

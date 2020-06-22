@@ -14,7 +14,7 @@ auth:
     ssh_user: ubuntu
 
 head_node:
-    InstanceType: m5.large
+    InstanceType: m4.16xlarge
     ImageId: ami-06d51e91cea0dac8d  # Ubuntu 18.04
     IamInstanceProfile: 
         Arn: arn:aws:iam::959243851260:instance-profile/sangcho-release-pipeline-testing
@@ -28,9 +28,9 @@ setup_commands:
     - sudo apt-get update -q
     - sudo apt-get install -y -q build-essential curl unzip
     # Install Anaconda.
-    # - wget -q https://repo.continuum.io/archive/Anaconda3-5.0.1-Linux-x86_64.sh
-    # - bash Anaconda3-5.0.1-Linux-x86_64.sh -b -p $HOME/anaconda3 || true
-    # - echo 'export PATH="$HOME/anaconda3/bin:$PATH"' >> ~/.bashrc
+    - wget -q https://repo.continuum.io/archive/Anaconda3-5.0.1-Linux-x86_64.sh
+    - bash Anaconda3-5.0.1-Linux-x86_64.sh -b -p $HOME/anaconda3 || true
+    - echo 'export PATH="$HOME/anaconda3/bin:$PATH"' >> ~/.bashrc
     # - pip install -U pip || true
 
 # Custom commands that will be run on worker nodes after common setup.
