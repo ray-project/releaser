@@ -99,7 +99,7 @@ class Scheduler:
         while True:
             try:
                 self.process()
-            except as e:
+            except Exception as e:
                 print(f"Error occured while processing: {e}")
                 print(traceback.format_exc())
             finally:

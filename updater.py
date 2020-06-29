@@ -38,7 +38,7 @@ class SlackBot:
     def send_message(self, text):
         try:
             response = self.client.chat_postMessage(
-                channel=CHANNEL,
+                channel=self.channel,
                 text=text)
             assert response.status_code == 200
         except SlackApiError as e:
@@ -111,6 +111,11 @@ class PostProcessor:
         self.slackbot.send_message(result_string)
 
     def download_logs(self, test_type, session_name):
+        """Download logs for the release test.
+        
+        NOTE: Anyscale CLI currently only supports getting stdout
+              of logs. The function name is a little bit misleading.
+        """
         with cd(get_test_dir(test_type)):
             output, _, _ = run_subprocess(
                 ["anyscale", "session", "logs"],

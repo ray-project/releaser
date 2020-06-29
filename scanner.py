@@ -20,6 +20,8 @@ class SessionState(BaseModel):
     created_at: str
     name: str
     status: str
+    startup_error: str
+    stop_error: str
 
 
 class Scanner:
@@ -55,6 +57,8 @@ class Scanner:
             )
             assert output is not None, (
                 f"Didn't get output from {' '.join(command)}")
+            from pprint import pprint
+            print(output.replace("'", "\""))
 
             # Parse session information.
             for session_info in json.loads(output.replace("'", "\"")):

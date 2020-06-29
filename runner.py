@@ -31,4 +31,3 @@ class Runner:
         print(f"It will run {self.context.test_type} test.")
         with cd(self.test_folder):
             self.test_controller.run()
-
