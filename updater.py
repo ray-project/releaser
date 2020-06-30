@@ -118,7 +118,7 @@ class PostProcessor:
         """
         with cd(get_test_dir(test_type)):
             output, _, _ = run_subprocess(
-                ["anyscale", "session", "logs"],
+                ["anyscale", "session", "logs", f"--name={session_name}"],
                 print_output=False)
         return output
 
