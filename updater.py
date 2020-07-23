@@ -14,6 +14,7 @@ from slack.errors import SlackApiError
 
 import constant
 
+from config_manager import get_test_dir
 from release_tests import registry
 from controller import TestController
 from context import Context
@@ -22,7 +23,6 @@ from util import (
     cd,
     run_subprocess,
     check_project_created,
-    get_test_dir,
     get_current_time)
 
 logging.basicConfig(level=logging.INFO)

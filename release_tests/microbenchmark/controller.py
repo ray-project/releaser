@@ -45,4 +45,3 @@ class MicrobenchmarkTestController(TestController):
             f"*Result*\n"
             f"{results}")
         return result_string
-

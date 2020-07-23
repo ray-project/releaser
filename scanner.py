@@ -4,8 +4,9 @@ from typing import List, Dict
 
 from pydantic import BaseModel
 
+from config_manager import get_test_dir
 from release_tests import registry
-from util import run_subprocess, get_test_dir, cd
+from util import run_subprocess, cd
 
 class CommandState(BaseModel):
     created_at: str

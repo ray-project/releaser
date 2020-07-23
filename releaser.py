@@ -15,6 +15,11 @@ def cli():
 
 # -- Default CLI --
 @cli.command()
+def auto_configure():
+    api.configure_automatically()
+
+
+@cli.command()
 @click.option(
     "--test-type",
     required=True,
@@ -33,6 +38,7 @@ def cli():
     type=bool
 )
 def stop(test_type: str, session_name: str, terminate: bool):
+    api.check_configuration()
     api.stop(test_type, session_name, terminate)
 
 
@@ -48,6 +54,7 @@ def stop(test_type: str, session_name: str, terminate: bool):
     type=str
 )
 def update(test_type: str, session_name: str):
+    api.check_configuration()
     api.update(test_type, session_name)
 
 
@@ -66,6 +73,7 @@ def update(test_type: str, session_name: str):
     type=bool
 )
 def cleanup(test_type: str, all: bool):
+    api.check_configuration()
     api.cleanup(test_type, all)
 
 
@@ -77,13 +85,15 @@ def cleanup(test_type: str, all: bool):
     type=click.Choice(registry.release_tests),
 )
 def kill_old_sessions(test_type: str):
+    api.check_configuration()
     api.force_terminate_old_sessions(test_type)
 
 
 # -- Command Runner CLI --
+# NEW_TESTS - CommandLine
 @cli.group()
 def run():
-    pass
+    api.check_configuration()
 
 
 @run.command()

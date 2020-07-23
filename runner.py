@@ -5,13 +5,13 @@ from dataclasses import dataclass
 import release_tests
 
 from context import Context
+from config_manager import get_test_dir
 from controller import TestController
 from github_manager import GithubManager
 from util import (
     cd,
     run_subprocess,
-    check_project_created,
-    get_test_dir
+    check_project_created
 )
 
 

@@ -7,6 +7,8 @@ from uuid import uuid4
 
 import constant
 
+from config_manager import global_config_manager
+
 class cd:
     """Context manager for changing the current working directory"""
     def __init__(self, path):
@@ -28,10 +30,6 @@ def check_project_created(project_folder: str) -> None:
             f"You should create a project using anyscale init inside the"
             f"project folder."
         )
-
-
-def get_test_dir(test_type: str) -> str:
-    return constant.RELEASE_TEST_DIR / test_type
 
 
 def run_subprocess(command: list, print_output: bool = True):

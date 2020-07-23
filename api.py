@@ -1,16 +1,20 @@
 import traceback
 
 from typing import List
+from pathlib import Path
 
 import constant
 from release_tests import registry
 
 from context import Context
+from config_manager import global_config_manager
+from github_manager import GithubManager
 from runner import Runner
 from updater import PostProcessor, SlackBot, S3Updater
 from scanner import Scanner
 
 # -- Release Test Run APIs --
+# NEW_TESTS - BASIC
 def run_microbenchmark(session_id: str = None,
                        ray_version: str = None,
                        commit: str = None,
@@ -97,3 +101,18 @@ def force_terminate_old_sessions(test_type: str):
                 f"Session Name {old_session_name} is "
                 "foreced killed because it is old.")
             stop(test_type, old_session_name, terminate=True)
+
+
+def check_configuration():
+    global_config_manager.config_update_if_needed()
+
+
+def configure_automatically():
+    if global_config_manager.config_exists:
+        print("Configuration already exists")
+        return
+    ray_path = Path.cwd() / "ray"
+    if not Path(ray_path).exists():
+        github_manager = GithubManager(constant.REPO_NAME)
+        github_manager.clone(constant.RAY_REPO_URL)
+    global_config_manager.config_update_if_needed(str(ray_path))
