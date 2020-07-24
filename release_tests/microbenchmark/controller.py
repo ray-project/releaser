@@ -17,10 +17,11 @@ class MicrobenchmarkTestController(TestController):
         run_subprocess([
             "anyscale",
             "start", "--session-name", f"{self.context.session_name}",
-            "--run", "run",
-            "--ray_version", f"{self.context.version}",
-            "--ray_branch", f"{self.context.branch}",
-            "--commit", f"{self.context.commit}"
+            "--shell",
+            "\"bash run.sh "
+            f"--ray-version={self.context.version} "
+            f"--ray-branch={self.context.branch} "
+            f"--commit={self.context.commit}\""
         ])
 
     def process_logs(self, log_output_lines: list) -> str:

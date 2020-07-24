@@ -131,5 +131,134 @@ def microbenchmark(session_id: str,
                            ray_branch=ray_branch)
 
 
+@run.command()
+@click.option(
+    "--session-id",
+    required=False,
+    default=None,
+    type=str
+)
+@click.option(
+    "--ray-version",
+    required=False,
+    default=None,
+    type=str
+)
+@click.option(
+    "--commit",
+    required=False,
+    type=str,
+    default=None
+)
+@click.option(
+    "--ray-branch",
+    required=False,
+    default=None,
+    type=str
+)
+@click.option(
+    "--workload",
+    required=True,
+    default=None,
+    type=str
+)
+def stress_tests(session_id: str,
+                   ray_version: str,
+                   commit: str,
+                   ray_branch: str,
+                   workload: str):
+    api.run_stress_tests(session_id=session_id,
+                         ray_version=ray_version,
+                         commit=commit,
+                         ray_branch=ray_branch,
+                         workload=workload)
+
+
+@run.command()
+@click.option(
+    "--session-id",
+    required=False,
+    default=None,
+    type=str
+)
+@click.option(
+    "--ray-version",
+    required=False,
+    default=None,
+    type=str
+)
+@click.option(
+    "--commit",
+    required=False,
+    type=str,
+    default=None
+)
+@click.option(
+    "--ray-branch",
+    required=False,
+    default=None,
+    type=str
+)
+@click.option(
+    "--workload",
+    required=True,
+    default=None,
+    type=str
+)
+def long_running_tests(session_id: str,
+                       ray_version: str,
+                       commit: str,
+                       ray_branch: str,
+                       workload: str):
+    api.long_running_tests(session_id=session_id,
+                           ray_version=ray_version,
+                           commit=commit,
+                           ray_branch=ray_branch,
+                           workload=workload)
+
+
+@run.command()
+@click.option(
+    "--session-id",
+    required=False,
+    default=None,
+    type=str
+)
+@click.option(
+    "--ray-version",
+    required=False,
+    default=None,
+    type=str
+)
+@click.option(
+    "--commit",
+    required=False,
+    type=str,
+    default=None
+)
+@click.option(
+    "--ray-branch",
+    required=False,
+    default=None,
+    type=str
+)
+@click.option(
+    "--workload",
+    required=True,
+    default=None,
+    type=str
+)
+def long_running_distributed_tests(session_id: str,
+                                   ray_version: str,
+                                   commit: str,
+                                   ray_branch: str,
+                                   workload: str):
+    api.long_running_distributed_tests(session_id=session_id,
+                                       ray_version=ray_version,
+                                       commit=commit,
+                                       ray_branch=ray_branch,
+                                       workload=workload)
+
+
 if __name__ == "__main__":
     cli()

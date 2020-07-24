@@ -24,6 +24,8 @@ class Context:
     test_type: str = None
     # This value should not be explictly set.
     session_name: str = None
+    # [Optional] Workload you want to run.
+    workload: str = None
 
     def post_process(self) -> None:
         """Implement this method to do post validation."""

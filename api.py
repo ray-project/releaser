@@ -15,7 +15,7 @@ from scanner import Scanner
 
 # -- Release Test Run APIs --
 # NEW_TESTS - BASIC
-def run_microbenchmark(session_id: str = None,
+def run_microbenchmark(session_id: str = None, # Specify it if you want to have a custom session name.
                        ray_version: str = None,
                        commit: str = None,
                        ray_branch: str = None) -> None:
@@ -23,6 +23,54 @@ def run_microbenchmark(session_id: str = None,
         test_type=registry.MICROBENCHMARK,
         version=ray_version, commit=commit,
         branch=ray_branch, session_id=session_id)
+    runner = Runner(context)
+    runner.run()
+
+
+def run_stress_tests(session_id: str = None,
+                     ray_version: str = None,
+                     commit: str = None,
+                     ray_branch: str = None,
+                     workload: str = None) -> None:
+    context = Context(
+        test_type=registry.STRESS_TESTS,
+        version=ray_version,
+        commit=commit,
+        branch=ray_branch,
+        session_id=session_id,
+        workload=workload)
+    runner = Runner(context)
+    runner.run()
+
+
+def run_long_running_tests(session_id: str = None,
+                           ray_version: str = None,
+                           commit: str = None,
+                           ray_branch: str = None,
+                           workload: str = None) -> None:
+    context = Context(
+        test_type=registry.LONG_RUNNING_TESTS,
+        version=ray_version,
+        commit=commit,
+        branch=ray_branch,
+        session_id=session_id,
+        workload=workload)
+    runner = Runner(context)
+    runner.run()
+
+
+def run_long_running_distributed_tests(session_id: str = None,
+                                       ray_version: str = None,
+                                       commit: str = None,
+                                       ray_branch: str = None,
+                                       workload: str = None) -> None:
+    context = Context(
+        test_type=registry.LONG_RUNNING_TESTS,
+        version=ray_version,
+        commit=commit,
+        branch=ray_branch,
+        session_id=session_id,
+        workload=workload)
     runner = Runner(context)
     runner.run()
 
