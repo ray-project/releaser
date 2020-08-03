@@ -21,7 +21,7 @@ class LongRunningTestsController(TestController):
             "\"bash run.sh "
             f"--ray-version={self.context.version} "
             f"--ray-branch={self.context.branch} "
-            f"--commit={self.context.commit}"
+            f"--commit={self.context.commit} "
             f"--workload={self.context.workload}\""
         ])
 

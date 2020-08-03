@@ -17,7 +17,7 @@ class MicrobenchmarkTestController(TestController):
         run_subprocess([
             "anyscale",
             "start", "--session-name", f"{self.context.session_name}",
-            "--shell",
+            "--run",
             "\"bash run.sh "
             f"--ray-version={self.context.version} "
             f"--ray-branch={self.context.branch} "
