@@ -19,7 +19,8 @@ Adding new tests is the most important use case for releaser. Please follow the 
 ### Add a New Test
 Releaser requires you to add APIs that are shared by both the command line tool and cron job.
 
-Search NEW_TESTS - BASIC. It will give you a list of files that you should modify to support new tests.
+Search this repo for "NEW_TESTS - BASIC".
+It will give you a list of files that you should modify to support new tests.
 
 #### release_tests/[test_name]/controller.py
 You first need to create a controller.py. Controller is a class that has the core logic of each release tests. For example,

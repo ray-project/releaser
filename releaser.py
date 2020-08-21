@@ -1,12 +1,8 @@
-from typing import List
-
 import click
 
 import api
 from release_tests import registry
 
-from context import Context
-from runner import Runner
 
 @click.group()
 def cli():
@@ -285,6 +281,92 @@ def long_running_distributed_tests(session_id: str,
                                            commit=commit,
                                            ray_branch=ray_branch,
                                            workload=workload)
+
+
+@run.command()
+@click.option(
+    "--session-id",
+    required=False,
+    default=None,
+    type=str
+)
+@click.option(
+    "--ray-version",
+    required=False,
+    default=None,
+    type=str
+)
+@click.option(
+    "--commit",
+    required=False,
+    type=str,
+    default=None
+)
+@click.option(
+    "--ray-branch",
+    required=False,
+    default=None,
+    type=str
+)
+@click.option(
+    "--workload",
+    required=False,
+    default=None,
+    type=str
+)
+def rllib_regression_tests(session_id: str,
+                           ray_version: str,
+                           commit: str,
+                           ray_branch: str,
+                           workload: str):
+    api.run_rllib_regression_tests(session_id=session_id,
+                                   ray_version=ray_version,
+                                   commit=commit,
+                                   ray_branch=ray_branch,
+                                   workload=workload)
+
+
+@run.command()
+@click.option(
+    "--session-id",
+    required=False,
+    default=None,
+    type=str
+)
+@click.option(
+    "--ray-version",
+    required=False,
+    default=None,
+    type=str
+)
+@click.option(
+    "--commit",
+    required=False,
+    type=str,
+    default=None
+)
+@click.option(
+    "--ray-branch",
+    required=False,
+    default=None,
+    type=str
+)
+@click.option(
+    "--workload",
+    required=False,
+    default=None,
+    type=str
+)
+def run_rllib_unit_gpu_tests(session_id: str,
+                           ray_version: str,
+                           commit: str,
+                           ray_branch: str,
+                           workload: str):
+    api.run_rllib_unit_gpu_tests(session_id=session_id,
+                                 ray_version=ray_version,
+                                 commit=commit,
+                                 ray_branch=ray_branch,
+                                 workload=workload)
 
 
 if __name__ == "__main__":

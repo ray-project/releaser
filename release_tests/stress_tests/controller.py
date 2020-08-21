@@ -1,12 +1,8 @@
-import os
-
-from dataclasses import dataclass
-
 from controller import TestController
 from context import Context
-from util import run_subprocess, SessionNameBuilder
+from util import run_subprocess
 
-MICROBENCHMARK_LOG_IDENTIFIER = ["single", "multi", "1:1", "1:n", "n:n"]
+# MICROBENCHMARK_LOG_IDENTIFIER = ["single", "multi", "1:1", "1:n", "n:n"]
 
 
 class StressTestController(TestController):

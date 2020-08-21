@@ -27,28 +27,6 @@ def run_microbenchmark(session_id: str = None, # Specify it if you want to have 
     runner.run()
 
 
-def run_stress_tests(session_id: str = None,
-                     ray_version: str = None,
-                     commit: str = None,
-                     ray_branch: str = None,
-                     workload: str = None) -> None:
-    if not workload:
-        workloads = registry.STRESS_TESTS_WORKLOADS
-    else:
-        workloads = [workload]
-    
-    for work in workloads:
-        context = Context(
-            test_type=registry.STRESS_TESTS,
-            version=ray_version,
-            commit=commit,
-            branch=ray_branch,
-            session_id=session_id,
-            workload=work)
-        runner = Runner(context)
-        runner.run()
-
-
 def run_long_running_tests(session_id: str = None,
                            ray_version: str = None,
                            commit: str = None,
@@ -58,7 +36,7 @@ def run_long_running_tests(session_id: str = None,
         workloads = registry.LONG_RUNNING_TESTS_WORKLOADS
     else:
         workloads = [workload]
-    
+
     for work in workloads:
         context = Context(
             test_type=registry.LONG_RUNNING_TESTS,
@@ -80,10 +58,76 @@ def run_long_running_distributed_tests(session_id: str = None,
         workloads = registry.LONG_RUNNING_DISTRIBUTED_TESTS_WORKLOADS
     else:
         workloads = [workload]
-    
+
     for work in workloads:
         context = Context(
             test_type=registry.LONG_RUNNING_DISTRIBUTED_TESTS,
+            version=ray_version,
+            commit=commit,
+            branch=ray_branch,
+            session_id=session_id,
+            workload=work)
+        runner = Runner(context)
+        runner.run()
+
+
+def run_rllib_regression_tests(session_id: str = None,
+                               ray_version: str = None,
+                               commit: str = None,
+                               ray_branch: str = None,
+                               workload: str = None) -> None:
+    if not workload:
+        workloads = registry.RLLIB_REGRESSION_TESTS
+    else:
+        workloads = [workload]
+
+    for work in workloads:
+        context = Context(
+            test_type=registry.RLLIB_REGRESSION_TESTS,
+            version=ray_version,
+            commit=commit,
+            branch=ray_branch,
+            session_id=session_id,
+            workload=work)
+        runner = Runner(context)
+        runner.run()
+
+
+def run_rllib_unit_gpu_tests(session_id: str = None,
+                             ray_version: str = None,
+                             commit: str = None,
+                             ray_branch: str = None,
+                             workload: str = None) -> None:
+    if not workload:
+        workloads = registry.RLLIB_UNIT_GPU_TESTS
+    else:
+        workloads = [workload]
+
+    for work in workloads:
+        context = Context(
+            test_type=registry.RLLIB_UNIT_GPU_TESTS,
+            version=ray_version,
+            commit=commit,
+            branch=ray_branch,
+            session_id=session_id,
+            workload=work)
+        runner = Runner(context)
+        runner.run()
+
+
+def run_stress_tests(session_id: str = None,
+                     ray_version: str = None,
+                     commit: str = None,
+                     ray_branch: str = None,
+                     workload: str = None) -> None:
+    if not workload:
+        workloads = registry.STRESS_TESTS_WORKLOADS
+    else:
+        workloads = [workload]
+
+    for work in workloads:
+        context = Context(
+            test_type=registry.STRESS_TESTS,
             version=ray_version,
             commit=commit,
             branch=ray_branch,
@@ -114,6 +158,14 @@ def run_all(ray_version: str = None,
                                        ray_version=ray_version,
                                        commit=commit,
                                        ray_branch=ray_branch)
+    run_rllib_regression_tests(session_id=None,
+                               ray_version=ray_version,
+                               commit=commit,
+                               ray_branch=ray_branch)
+    run_rllib_unit_gpu_tests(session_id=None,
+                             ray_version=ray_version,
+                             commit=commit,
+                             ray_branch=ray_branch)
 
 
 def stop(test_type: str, session_name: str, terminate: bool) -> None:
