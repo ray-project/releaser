@@ -6,3 +6,6 @@ boto3
 PyGithub
 pydantic
 pyyaml
+typer[all]
+toml
+python-dotenv

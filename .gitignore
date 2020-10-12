@@ -3,3 +3,6 @@ __pycache__
 .stfolder/
 .ipynb_checkpoints/
 ray
+.mypy_cache
+.vscode
+.env
