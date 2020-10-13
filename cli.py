@@ -174,7 +174,7 @@ def run_test(name: str, dryrun: bool = False):
     )
     execution_steps.append(f"anyscale push --all-nodes")
     execution_steps.append(
-        f"(anyscale exec --session-name {session_name} -- {exec_cmd}) 2>&1 | tee {os.getcwd()}/{session_name}.log"
+        f"(anyscale exec --session-name {session_name} -- {exec_cmd}) 2>&1 | tee {session_name}.log"
     )
     execution_steps.append(f"anyscale down --terminate {session_name}")
     execution_steps.append(
