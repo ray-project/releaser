@@ -39,10 +39,10 @@ python {{ctx["workload"]}}.py
     workload = "handle"
 
     [[serve.case]]
-    workload = "scalability.py"
+    workload = "scalability"
 
     [[serve.case]]
-    workload = "microbenchmark.py"
+    workload = "microbenchmark"
 
 [microbenchmark]
 base_dir = "ci/microbenchmark"
@@ -56,12 +56,12 @@ bash run.sh --ray-version={{ctx["ray_version"]}} \
 # ---------------------------------------------------
 # RLlib tests.
 # ---------------------------------------------------
-[rllib_unit_gpu_tests]
-base_dir = "ci/rllib_tests/unit_gpu_tests"
-cluster_config = "ray-project/cluster.yaml"
-exec_cmd = """
-bash run.sh --ray-version={{ctx["ray_version"]}} \
-            --commit={{ctx["git_commit"]}} \
-            --ray-branch={{ctx["git_branch"]}} \
-            --workload={{ctx["workload"]}}
-"""
+# [rllib_unit_gpu_tests]
+# base_dir = "ci/rllib_tests/unit_gpu_tests"
+# cluster_config = "ray-project/cluster.yaml"
+# exec_cmd = """
+# bash run.sh --ray-version={{ctx["ray_version"]}} \
+#             --commit={{ctx["git_commit"]}} \
+#             --ray-branch={{ctx["git_branch"]}} \
+#             --workload={{ctx["workload"]}}
+# """
