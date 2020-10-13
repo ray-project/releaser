@@ -9,3 +9,4 @@ pyyaml
 typer[all]
 toml
 python-dotenv
+expiringdict
