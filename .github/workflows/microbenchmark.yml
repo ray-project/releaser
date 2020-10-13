@@ -30,4 +30,4 @@ jobs:
         ANYSCALE_HOST: https://anyscale.dev
         ANYSCALE_CLI_TOKEN: ${{ secrets.ANYSCALE_CLI_TOKEN }}
       run: |
-        python cli.py --git-commit 0d09a17c646de4cf7269ae673cf15f8945208313 suite:run microbenchmark
+        python cli.py --git-commit 39e809fa03aadd2b883c9098f87342a428550b35 suite:run microbenchmark

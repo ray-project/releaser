@@ -178,7 +178,7 @@ def run_test(name: str, dryrun: bool = False):
     )
     execution_steps.append(f"anyscale down --terminate {session_name}")
     execution_steps.append(
-        f"aws cp {session_name}.log s3://ray-travis-logs/periodic_tests/{name}/{session_name}.log"
+        f"aws s3 cp {session_name}.log s3://ray-travis-logs/periodic_tests/{name}/{session_name}.log"
     )
 
     color_print(f"🗺 Execution plan (within {base_dir})")
