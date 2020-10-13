@@ -1,11 +1,13 @@
-[microbenchmark]
-base_dir = "ci/microbenchmark"
-cluster_config = "ray-project/cluster.yaml"
-exec_cmd = """
-bash run.sh --ray-version={{ctx["ray_version"]}} \
-            --commit={{ctx["git_commit"]}} \
-            --ray-branch={{ctx["git_branch"]}}
-"""
+# Define all test suites in this file here (by adding a new section).
+
+# [test_suite_name]: The name of your test suite. Use this exact name on the
+#   command line when running cli.py suite:run [test_suite_name]. Do not replace
+#   "_" with "-".
+# base_dir: The directory inside the ray repository, in which to operate. Files
+#   used in `exec_cmd` (e.g. run.sh) should be located here.
+# cluster_config: The path+filename of the cluster yaml config to use to bring
+#   up a ray cluster. The path is relative to the `base_dir` above.
+# exec_cmd: The actual command to run (on the created cluster).
 
 [long_running_tests]
 base_dir = "ci/long_running_tests"
@@ -22,3 +24,25 @@ bash run.sh --ray-version={{ctx["ray_version"]}} \
 
     [[long_running_tests.case]]
     workload = "many_tasks"
+
+[microbenchmark]
+base_dir = "ci/microbenchmark"
+cluster_config = "ray-project/cluster.yaml"
+exec_cmd = """
+bash run.sh --ray-version={{ctx["ray_version"]}} \
+            --commit={{ctx["git_commit"]}} \
+            --ray-branch={{ctx["git_branch"]}}
+"""
+
+# ---------------------------------------------------
+# RLlib tests.
+# ---------------------------------------------------
+[rllib_unit_gpu_tests]
+base_dir = "ci/rllib_tests/unit_gpu_tests"
+cluster_config = "ray-project/cluster.yaml"
+exec_cmd = """
+bash run.sh --ray-version={{ctx["ray_version"]}} \
+            --commit={{ctx["git_commit"]}} \
+            --ray-branch={{ctx["git_branch"]}} \
+            --workload={{ctx["workload"]}}
+"""
