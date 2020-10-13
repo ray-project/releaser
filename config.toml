@@ -21,4 +21,23 @@ bash run.sh --ray-version={{ctx["ray_version"]}} \
     workload = "serve"
 
     [[long_running_tests.case]]
+    workload = "serve_failure"
+
+    [[long_running_tests.case]]
     workload = "many_tasks"
+
+[serve]
+base_dir = "python/ray/serve/benchmarks"
+cluster_config = "cluster.yaml"
+exec_cmd = """
+python {{ctx["workload"]}}.py
+"""
+
+    [[serve.case]]
+    workload = "handle"
+
+    [[serve.case]]
+    workload = "scalability.py"
+
+    [[serve.case]]
+    workload = "microbenchmark.py"

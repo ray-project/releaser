@@ -150,12 +150,25 @@ def run_test(name: str, dryrun: bool = False):
     cluster_config = suite_config["cluster_config"]
     exec_cmd = suite_config["exec_cmd"].strip()
 
+    project_name = f"{PREFIX}-{name}"
     session_name = int(time.time())
+    known_project_id = None
+    with cd(os.path.join("ray", base_dir)):
+        prj_id = run_shell(
+            f"""anyscale list projects --json | jq '.[] | select(.name=="{project_name}") | .url  | split("/") | .[-1]'""".strip()
+        ).stdout.strip()
+        if len(prj_id):
+            known_project_id = prj_id
 
     execution_steps = []
-    execution_steps.append(
-        f"anyscale init --name {PREFIX}-{name} --config {cluster_config} || echo 'Project already registered.'"
-    )
+    if known_project_id:
+        execution_steps.append(
+            f"echo 'project_id: {known_project_id}' > .anyscale.yaml"
+        )
+    else:
+        execution_steps.append(
+            f"anyscale init --name {project_name} --config {cluster_config}"
+        )
     execution_steps.append(
         f"anyscale up --yes --config {cluster_config} {session_name}"
     )
@@ -168,7 +181,7 @@ def run_test(name: str, dryrun: bool = False):
         f"aws cp {session_name}.log s3://ray-travis-logs/periodic_tests/{name}/{session_name}.log"
     )
 
-    color_print(f"🗺  Execution plan (within {base_dir})")
+    color_print(f"🗺 Execution plan (within {base_dir})")
     for step in execution_steps:
         typer.echo("\t" + step)
 
