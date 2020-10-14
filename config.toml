@@ -30,19 +30,22 @@ bash run.sh --ray-version={{ctx["ray_version"]}} \
 
 [serve]
 base_dir = "python/ray/serve/benchmarks"
-cluster_config = "cluster.yaml"
+cluster_config = "single.yaml"
 exec_cmd = """
 python {{ctx["workload"]}}.py
 """
-
     [[serve.case]]
     workload = "handle"
 
     [[serve.case]]
-    workload = "scalability"
-
-    [[serve.case]]
     workload = "microbenchmark"
+
+[serve_cluster]
+base_dir = "python/ray/serve/benchmarks"
+cluster_config = "cluster.yaml"
+exec_cmd = """
+python scalability.py
+"""
 
 [microbenchmark]
 base_dir = "ci/microbenchmark"

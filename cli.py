@@ -88,12 +88,16 @@ def cd(path):
 
 
 @app.callback()
-def ensure_repo(git_branch: str = "master", git_commit: Optional[str] = None):
+def ensure_repo(
+    git_branch: str = "master",
+    git_commit: Optional[str] = None,
+    git_org: Optional[str] = "ray-project",
+):
     color_print("Running precondition check...")
 
     if not os.path.exists("ray"):
         color_print("💾 Ray repository not found. Cloning...")
-        run_shell("git clone https://github.com/ray-project/ray.git")
+        run_shell(f"git clone https://github.com/{git_org}/ray.git")
 
     with cd("ray"):
         color_print(f"💰 Checking out {git_branch}")
@@ -137,7 +141,7 @@ def validate_tests():
 
 
 @app.command("suite:run")
-def run_test(name: str, dryrun: bool = False):
+def run_test(name: str, dryrun: bool = False, wait: bool = True):
     """Run a single test suite given `name`."""
     config = _get_config()
     all_suites = list(config.keys())
@@ -153,10 +157,10 @@ def run_test(name: str, dryrun: bool = False):
     project_name = f"{PREFIX}-{name}"
     session_name = int(time.time())
     known_project_id = None
+    get_prj_id_cmd = f"""anyscale list projects --json | jq '.[] | select(.name=="{project_name}") | .url  | split("/") | .[-1]'""".strip()
+
     with cd(os.path.join("ray", base_dir)):
-        prj_id = run_shell(
-            f"""anyscale list projects --json | jq '.[] | select(.name=="{project_name}") | .url  | split("/") | .[-1]'""".strip()
-        ).stdout.strip()
+        prj_id = run_shell(get_prj_id_cmd).stdout.strip()
         if len(prj_id):
             known_project_id = prj_id
 
@@ -167,12 +171,13 @@ def run_test(name: str, dryrun: bool = False):
         )
     else:
         execution_steps.append(
-            f"anyscale init --name {project_name} --config {cluster_config}"
+            f"rm .anyscale.yaml && anyscale init --name {project_name} --config {cluster_config}"
         )
     execution_steps.append(
         f"anyscale up --yes --config {cluster_config} {session_name}"
     )
-    execution_steps.append(f"anyscale push --all-nodes")
+    execution_steps.append(f"anyscale push")
+
     execution_steps.append(
         f"(anyscale exec --session-name {session_name} -- {exec_cmd}) 2>&1 | tee {session_name}.log"
     )
