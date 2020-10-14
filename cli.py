@@ -1,5 +1,5 @@
 import os
-from urllib.parse import parse_qs
+from urllib.parse import urlparse
 import subprocess
 from functools import partial
 from typing import Optional, Dict
@@ -212,12 +212,20 @@ def run_test(name: str, dryrun: bool = False, wait: bool = True):
         if not wait:
             color_print("🐍 Executing Custom Python Command")
             project_id = run_shell(get_prj_id_cmd).stdout.strip()
+            color_print(f"\t Got project id {project_id}")
             session_data = json.loads(
                 run_shell(
-                    f"""anyscale list session --json | jq  '.[] | select(.name=="{session_name}")'""".strip()
+                    f"""anyscale list sessions --json | jq  '.[] | select(.name=="{session_name}")'""".strip()
                 ).stdout
             )
-            session_id = parse_qs(session_data["tensorboard_url"])["session_id"][0]
+            # 'https://session-5lXRnKDZAwawKTENmm9VZ7.anyscaleuserdata-staging.com/jupyter/...""
+            session_id = (
+                "ses_"
+                + urlparse(session_data["jupyter_notebook_url"])
+                .netloc.split(".")[0]
+                .split("-")[1]
+            )
+            color_print(f"\t Got session id {session_id}")
 
             exec_cmd = "; ".join(
                 [
@@ -226,6 +234,7 @@ def run_test(name: str, dryrun: bool = False, wait: bool = True):
                     f"anyscale down --terminate {session_name}",
                 ]
             )
+            color_print(f"\t Issuing command {exec_cmd}")
 
             resp = requests.post(
                 f"https://anyscale.dev/api/v2/sessions/{session_id}/execute_shell_command",
