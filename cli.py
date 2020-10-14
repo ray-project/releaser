@@ -1,16 +1,18 @@
 import os
+from urllib.parse import parse_qs
 import subprocess
 from functools import partial
 from typing import Optional, Dict
-from contextlib import contextmanager, redirect_stderr, redirect_stdout
+from contextlib import contextmanager
 import time
 from pprint import pprint
-from toml import load
+import json
 
 import yaml
 import toml
 import typer
 import jinja2
+import requests
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -19,6 +21,10 @@ load_dotenv()
 app = typer.Typer()
 global_context: Dict[str, str] = dict()
 PREFIX = "release-automation"
+CLI_TOKEN = (
+    os.environ.get("ANYSCALE_CLI_TOKEN")
+    or json.load(open(os.path.expanduser("~/.anyscale/credentials.json")))["cli_token"]
+)
 ######
 
 ###### Helper Functions
@@ -145,7 +151,9 @@ def run_test(name: str, dryrun: bool = False, wait: bool = True):
     """Run a single test suite given `name`."""
     config = _get_config()
     all_suites = list(config.keys())
-    validate_tests()
+
+    # TODO(simon): re-enable this once fix-cluster-yaml branch merged and wheel produced
+    # validate_tests()
 
     assert name in all_suites, f"{name} not found. Available suites are {all_suites}."
 
@@ -157,7 +165,8 @@ def run_test(name: str, dryrun: bool = False, wait: bool = True):
     project_name = f"{PREFIX}-{name}"
     session_name = int(time.time())
     known_project_id = None
-    get_prj_id_cmd = f"""anyscale list projects --json | jq '.[] | select(.name=="{project_name}") | .url  | split("/") | .[-1]'""".strip()
+
+    get_prj_id_cmd = f"""anyscale list projects --json | jq --raw-output '.[] | select(.name=="{project_name}") | .url  | split("/") | .[-1]'""".strip()
 
     with cd(os.path.join("ray", base_dir)):
         prj_id = run_shell(get_prj_id_cmd).stdout.strip()
@@ -171,20 +180,23 @@ def run_test(name: str, dryrun: bool = False, wait: bool = True):
         )
     else:
         execution_steps.append(
-            f"rm .anyscale.yaml && anyscale init --name {project_name} --config {cluster_config}"
+            f"rm -f .anyscale.yaml && anyscale init --name {project_name} --config {cluster_config}"
         )
     execution_steps.append(
         f"anyscale up --yes --config {cluster_config} {session_name}"
     )
     execution_steps.append(f"anyscale push")
 
-    execution_steps.append(
-        f"(anyscale exec --session-name {session_name} -- {exec_cmd}) 2>&1 | tee {session_name}.log"
-    )
-    execution_steps.append(f"anyscale down --terminate {session_name}")
-    execution_steps.append(
-        f"aws s3 cp {session_name}.log s3://ray-travis-logs/periodic_tests/{name}/{session_name}.log"
-    )
+    if wait:
+        execution_steps.append(
+            f"(anyscale exec --session-name {session_name} -- {exec_cmd}) 2>&1 | tee {session_name}.log"
+        )
+        execution_steps.append(f"anyscale down --terminate {session_name}")
+        execution_steps.append(
+            f"aws s3 cp {session_name}.log s3://ray-travis-logs/periodic_tests/{name}/{session_name}.log"
+        )
+    else:
+        execution_steps.append("echo 'Custom Python Command'")
 
     color_print(f"🗺 Execution plan (within {base_dir})")
     for step in execution_steps:
@@ -196,6 +208,34 @@ def run_test(name: str, dryrun: bool = False, wait: bool = True):
     with cd(os.path.join("ray", base_dir)):
         for step in execution_steps:
             run_shell_stream(step)
+
+        if not wait:
+            color_print("🐍 Executing Custom Python Command")
+            project_id = run_shell(get_prj_id_cmd).stdout.strip()
+            session_data = json.loads(
+                run_shell(
+                    f"""anyscale list session --json | jq  '.[] | select(.name=="{session_name}")'""".strip()
+                ).stdout
+            )
+            session_id = parse_qs(session_data["tensorboard_url"])["session_id"][0]
+
+            exec_cmd = "; ".join(
+                [
+                    exec_cmd,
+                    f"echo 'project_id: {project_id}' > .anyscale.yaml",
+                    f"anyscale down --terminate {session_name}",
+                ]
+            )
+
+            resp = requests.post(
+                f"https://anyscale.dev/api/v2/sessions/{session_id}/execute_shell_command",
+                json={"shell_command": exec_cmd},
+                cookies={"cli_token": CLI_TOKEN},
+            )
+
+            assert resp.status_code == 200, resp.content
+
+            color_print("✅ Command Submitted.")
 
 
 if __name__ == "__main__":
