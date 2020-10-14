@@ -37,4 +37,4 @@ jobs:
         ANYSCALE_CLI_TOKEN: ${{ secrets.ANYSCALE_CLI_TOKEN }}
         TEST_SUITE: ${{ matrix.suite }}
       run: |
-        python cli.py suite:run long_running_tests-${TEST_SUITE}
+        python cli.py suite:run long_running_tests-${TEST_SUITE} --no-wait
