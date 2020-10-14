@@ -90,6 +90,11 @@ def cd(path):
     os.chdir(saved_path)
 
 
+def wheel_exists(ray_version, git_branch, git_commit):
+    url = f"https://s3-us-west-2.amazonaws.com/ray-wheels/{git_branch}/{git_commit}/ray-{ray_version}-cp36-cp36m-manylinux1_x86_64.whl"
+    return requests.get(url).status_code == 200
+
+
 ######
 
 
@@ -112,6 +117,19 @@ def ensure_repo(
         )
         if git_commit:
             run_shell(f"git checkout {git_commit}")
+        else:
+            # We want to find the latest commit with wheels available
+            for commit in run_shell(
+                r'git log --oneline -20 --pretty=format:"%H"'
+            ).stdout.splitlines(keepends=False):
+                commit = commit.strip()
+                run_shell(f"git checkout {commit}")
+                exec(run_shell('grep "__version__ = " python/ray/__init__.py').stdout)
+                if wheel_exists(locals()["__version__"], git_branch, commit):
+                    break
+            else:
+                color_print("Can't find a commit with wheels available!")
+                typer.Exit(1)
 
         latest_commit = run_shell(
             r'git --no-pager log -1 --oneline --no-color --pretty=format:"%h - %an, %cr: %s"'

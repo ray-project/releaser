@@ -4,7 +4,8 @@ on:
   push:
     branches: [ master ]
   schedule:
-    - cron: "0 * */1 * *"
+    # Everyday
+    - cron: "0 0 * * *"
 
 jobs:
   build:
@@ -37,4 +38,4 @@ jobs:
         ANYSCALE_CLI_TOKEN: ${{ secrets.ANYSCALE_CLI_TOKEN }}
         TEST_SUITE: ${{ matrix.suite }}
       run: |
-        python cli.py --git-org simon-mo --git-branch fix-cluster-yaml suite:run ${TEST_SUITE}
+        python cli.py suite:run ${TEST_SUITE}

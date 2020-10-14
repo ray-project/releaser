@@ -3,8 +3,9 @@ name: long-running-tests
 on:
   push:
     branches: [ master ]
-#   schedule:
-#     - cron: "0 */6 * * *"
+  schedule:
+    # Every Monday
+    - cron: "0 0 * * 1"
 
 jobs:
   build:
@@ -36,4 +37,4 @@ jobs:
         ANYSCALE_CLI_TOKEN: ${{ secrets.ANYSCALE_CLI_TOKEN }}
         TEST_SUITE: ${{ matrix.suite }}
       run: |
-        python cli.py --git-commit 39e809fa03aadd2b883c9098f87342a428550b35  suite:run long_running_tests-${TEST_SUITE}
+        python cli.py suite:run long_running_tests-${TEST_SUITE}
