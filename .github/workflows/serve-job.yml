@@ -3,9 +3,9 @@ name: serve-job
 on:
   push:
     branches: [ master ]
-  schedule:
+  #schedule:
     # Everyday
-    - cron: "0 0 * * *"
+    #- cron: "0 0 * * *"
 
 jobs:
   build:
