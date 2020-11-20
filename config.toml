@@ -9,52 +9,62 @@
 #   up a ray cluster. The path is relative to the `base_dir` above.
 # exec_cmd: The actual command to run (on the created cluster).
 
-[long_running_tests]
-base_dir = "ci/long_running_tests"
-cluster_config = "ray-project/cluster.yaml"
-exec_cmd = """
-bash run.sh --ray-version={{ctx["ray_version"]}} \
-            --commit={{ctx["git_commit"]}} \
-            --ray-branch={{ctx["git_branch"]}} \
-            --workload={{ctx["workload"]}}
-"""
-
-    [[long_running_tests.case]]
-    workload = "serve"
-
-    [[long_running_tests.case]]
-    workload = "serve_failure"
-
-    [[long_running_tests.case]]
-    workload = "many_tasks"
-
-[serve]
-base_dir = "python/ray/serve/benchmarks"
-cluster_config = "single.yaml"
-exec_cmd = """
-python {{ctx["workload"]}}.py
-"""
-    [[serve.case]]
-    workload = "handle"
-
-    [[serve.case]]
-    workload = "microbenchmark"
-
-[serve_cluster]
-base_dir = "python/ray/serve/benchmarks"
-cluster_config = "cluster.yaml"
-exec_cmd = """
-python scalability.py
-"""
-
+# ---------------------------------------------------
+# Regular job
+# --------------------------------------------------
 [microbenchmark]
-base_dir = "ci/microbenchmark"
-cluster_config = "ray-project/cluster.yaml"
+base_dir = "release/microbenchmark"
+cluster_config = "cluster.yaml"
 exec_cmd = """
 bash run.sh --ray-version={{ctx["ray_version"]}} \
             --commit={{ctx["git_commit"]}} \
             --ray-branch={{ctx["git_branch"]}}
 """
+
+# ---------------------------------------------------
+# Release tests.
+# --------------------------------------------------
+# [long_running_tests]
+# base_dir = "ci/long_running_tests"
+# cluster_config = "ray-project/cluster.yaml"
+# exec_cmd = """
+# bash run.sh --ray-version={{ctx["ray_version"]}} \
+#             --commit={{ctx["git_commit"]}} \
+#             --ray-branch={{ctx["git_branch"]}} \
+#             --workload={{ctx["workload"]}}
+# """
+
+#     [[long_running_tests.case]]
+#     workload = "serve"
+
+#     [[long_running_tests.case]]
+#     workload = "serve_failure"
+
+#     [[long_running_tests.case]]
+#     workload = "many_tasks"
+
+# ---------------------------------------------------
+# Serve tests.
+# --------------------------------------------------
+# [serve]
+# base_dir = "python/ray/serve/benchmarks"
+# cluster_config = "single.yaml"
+# exec_cmd = """
+# python {{ctx["workload"]}}.py
+# """
+#     [[serve.case]]
+#     workload = "handle"
+
+#     [[serve.case]]
+#     workload = "microbenchmark"
+
+# [serve_cluster]
+# base_dir = "python/ray/serve/benchmarks"
+# cluster_config = "cluster.yaml"
+# exec_cmd = """
+# python scalability.py
+# """
+
 
 # ---------------------------------------------------
 # RLlib tests.

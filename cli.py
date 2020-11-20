@@ -15,6 +15,7 @@ import jinja2
 import requests
 from dotenv import load_dotenv
 
+# Load .env file for secrets and environment variables
 load_dotenv()
 
 ###### Global Variables
@@ -28,15 +29,27 @@ CLI_TOKEN = (
 ######
 
 ###### Helper Functions
-run_shell = partial(
-    subprocess.run,
-    check=True,
-    shell=True,
-    stdout=subprocess.PIPE,
-    stderr=subprocess.PIPE,
-    encoding="utf-8",
-    executable="/bin/bash",
-)
+def run_shell(*args, **kwargs):
+    defualt_kwargs = dict(
+        shell=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        encoding="utf-8",
+        executable="/bin/bash",
+    )
+    defualt_kwargs.update(kwargs)
+
+    proc = subprocess.run(
+        *args,
+        **defualt_kwargs,
+    )
+    if proc.returncode != 0:
+        typer.secho(f"Failed to run {args}", fg=typer.colors.BRIGHT_RED)
+        typer.secho(proc.stdout, fg=typer.colors.RED)
+        raise typer.Exit(1)
+    return proc
+
+
 run_shell_stream = partial(run_shell, stdout=None, stderr=None)
 color_print = partial(typer.secho, fg=typer.colors.MAGENTA)
 
@@ -91,13 +104,14 @@ def cd(path):
 
 
 def wheel_exists(ray_version, git_branch, git_commit):
-    url = f"https://s3-us-west-2.amazonaws.com/ray-wheels/{git_branch}/{git_commit}/ray-{ray_version}-cp36-cp36m-manylinux1_x86_64.whl"
+    url = f"https://s3-us-west-2.amazonaws.com/ray-wheels/{git_branch}/{git_commit}/ray-{ray_version}-cp36-cp36m-manylinux2014_x86_64.whl"
     return requests.get(url).status_code == 200
 
 
 ######
 
 
+# This function runs before each CLI invocation
 @app.callback()
 def ensure_repo(
     git_branch: str = "master",
@@ -129,12 +143,12 @@ def ensure_repo(
                     break
             else:
                 color_print("Can't find a commit with wheels available!")
-                typer.Exit(1)
+                raise typer.Exit(1)
 
         latest_commit = run_shell(
             r'git --no-pager log -1 --oneline --no-color --pretty=format:"%h - %an, %cr: %s"'
         ).stdout.strip()
-        color_print(f'🧬 Latest commit is "{latest_commit}"')
+        color_print(f'🧬 Latest commit (with wheels) is "{latest_commit}"')
 
         global_context["git_branch"] = git_branch
         global_context["git_commit"] = run_shell("git rev-parse HEAD").stdout.strip()
@@ -165,14 +179,12 @@ def validate_tests():
 
 
 @app.command("suite:run")
-def run_test(name: str, dryrun: bool = False, wait: bool = True):
+def run_test(name: str, dry_run: bool = False, wait: bool = True):
     """Run a single test suite given `name`."""
+    validate_tests()
+
     config = _get_config()
     all_suites = list(config.keys())
-
-    # TODO(simon): re-enable this once fix-cluster-yaml branch merged and wheel produced
-    # validate_tests()
-
     assert name in all_suites, f"{name} not found. Available suites are {all_suites}."
 
     suite_config = config[name]
@@ -184,85 +196,52 @@ def run_test(name: str, dryrun: bool = False, wait: bool = True):
     session_name = int(time.time())
     known_project_id = None
 
+    # TODO(simon): Replace this call with anyscale SDK
     get_prj_id_cmd = f"""anyscale list projects --json | jq --raw-output '.[] | select(.name=="{project_name}") | .url  | split("/") | .[-1]'""".strip()
-
-    with cd(os.path.join("ray", base_dir)):
-        prj_id = run_shell(get_prj_id_cmd).stdout.strip()
-        if len(prj_id):
-            known_project_id = prj_id
+    prj_id = run_shell(get_prj_id_cmd).stdout.strip()
+    if len(prj_id):
+        known_project_id = prj_id
 
     execution_steps = []
     if known_project_id:
         execution_steps.append(
+            # Re-instantiate the project because it's already registered in the past.
             f"echo 'project_id: {known_project_id}' > .anyscale.yaml"
         )
     else:
         execution_steps.append(
+            # Create a new project
             f"rm -f .anyscale.yaml && anyscale init --name {project_name} --config {cluster_config}"
         )
     execution_steps.append(
-        f"anyscale up --yes --config {cluster_config} {session_name}"
+        # Create a new anyscale session
+        f"anyscale up --yes --cloud-name anyscale_default_cloud --config {cluster_config} {session_name}"
     )
-    execution_steps.append(f"anyscale push")
+    execution_steps.append(
+        # Push all the files over to the remote session
+        f"anyscale push"
+    )
 
-    if wait:
-        execution_steps.append(
-            f"(anyscale exec --session-name {session_name} -- {exec_cmd}) 2>&1 | tee {session_name}.log"
-        )
-        execution_steps.append(f"anyscale down --terminate {session_name}")
-        execution_steps.append(
-            f"aws s3 cp {session_name}.log s3://ray-travis-logs/periodic_tests/{name}/{session_name}.log"
-        )
-    else:
-        execution_steps.append("echo 'Custom Python Command'")
+    exec_options = "" if wait else "--tmux"
+    execution_steps.append(
+        f"anyscale exec --stop {exec_options} --session-name {session_name} -- {exec_cmd}"
+    )
 
-    color_print(f"🗺 Execution plan (within {base_dir})")
+    color_print(f"🗺 Execution plan (within ray/{base_dir})")
     for step in execution_steps:
         typer.echo("\t" + step)
 
-    if dryrun:
+    if dry_run:
         return
+    else:
+        color_print(
+            "🏎 Execution the command now. (Tip: --dry-run to skip execution, --no-wait for async execution)"
+        )
 
     with cd(os.path.join("ray", base_dir)):
         for step in execution_steps:
+
             run_shell_stream(step)
-
-        if not wait:
-            color_print("🐍 Executing Custom Python Command")
-            project_id = run_shell(get_prj_id_cmd).stdout.strip()
-            color_print(f"\t Got project id {project_id}")
-            session_data = json.loads(
-                run_shell(
-                    f"""anyscale list sessions --json | jq  '.[] | select(.name=="{session_name}")'""".strip()
-                ).stdout
-            )
-            # 'https://session-5lXRnKDZAwawKTENmm9VZ7.anyscaleuserdata-staging.com/jupyter/...""
-            session_id = (
-                "ses_"
-                + urlparse(session_data["jupyter_notebook_url"])
-                .netloc.split(".")[0]
-                .split("-")[1]
-            )
-            color_print(f"\t Got session id {session_id}")
-
-            exec_cmd = "; ".join(
-                [
-                    exec_cmd,
-                    f"echo 'project_id: {project_id}' > .anyscale.yaml",
-                    f"anyscale down --terminate {session_name}",
-                ]
-            )
-            color_print(f"\t Issuing command {exec_cmd}")
-
-            resp = requests.post(
-                f"https://anyscale.dev/api/v2/sessions/{session_id}/execute_shell_command",
-                json={"shell_command": exec_cmd},
-                cookies={"cli_token": CLI_TOKEN},
-            )
-
-            assert resp.status_code == 200, resp.content
-
-            color_print("✅ Command Submitted.")
 
 
 if __name__ == "__main__":
