@@ -193,7 +193,8 @@ def run_test(name: str, dry_run: bool = False, wait: bool = True):
     exec_cmd = suite_config["exec_cmd"].strip()
 
     project_name = f"{PREFIX}-{name}"
-    session_name = int(time.time())
+    # session_name format: gitsha-timestamp
+    session_name = global_context["git_commit"][:6] + f"-{int(time.time())}"
     known_project_id = None
 
     # TODO(simon): Replace this call with anyscale SDK

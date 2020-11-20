@@ -3,9 +3,10 @@ name: microbenchmark
 on:
   push:
     branches: [ master ]
-  #schedule:
-     #Everyday
-    #- cron: "0 0 * * *"
+  schedule:
+    #  Everyday
+    - cron: "0 0 * * *"
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -15,20 +16,12 @@ jobs:
       uses: actions/setup-python@v2
       with:
         python-version: 3.8
-    - name: Configure AWS Credentials
-      uses: aws-actions/configure-aws-credentials@v1
-      with:
-        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-        aws-region: us-west-2
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
         pip install -r requirements.txt
     - name: Run microbenchmark
-#       TODO(simon): automatically determine the commmit from a day agao
       env:
-        ANYSCALE_HOST: https://anyscale.dev
         ANYSCALE_CLI_TOKEN: ${{ secrets.ANYSCALE_CLI_TOKEN }}
       run: |
         python cli.py suite:run microbenchmark
