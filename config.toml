@@ -43,6 +43,23 @@ bash run.sh --ray-version={{ctx["ray_version"]}} \
 #     [[long_running_tests.case]]
 #     workload = "many_tasks"
 
+[long_running_distributed]
+base_dir = "release/long_running_distributed_tests"
+cluster_config = "cluster.yaml"
+exec_cmd = """
+bash run.sh --ray-version={{ctx["ray_version"]}} \
+            --commit={{ctx["git_commit"]}} \
+            --ray-branch={{ctx["git_branch"]}} \
+            --workload={{ctx["workload"]}}
+"""
+
+    [[long_running_distributed.case]]
+    workload = "pytorch_pbt_failure"
+
+    [[long_running_distributed.case]]
+    workload = "horovod_test"
+
+
 # ---------------------------------------------------
 # Serve tests.
 # --------------------------------------------------
@@ -69,12 +86,29 @@ bash run.sh --ray-version={{ctx["ray_version"]}} \
 # ---------------------------------------------------
 # RLlib tests.
 # ---------------------------------------------------
-# [rllib_unit_gpu_tests]
-# base_dir = "ci/rllib_tests/unit_gpu_tests"
-# cluster_config = "ray-project/cluster.yaml"
-# exec_cmd = """
-# bash run.sh --ray-version={{ctx["ray_version"]}} \
-#             --commit={{ctx["git_commit"]}} \
-#             --ray-branch={{ctx["git_branch"]}} \
-#             --workload={{ctx["workload"]}}
-# """
+[rllib_regression_tests]
+base_dir = "release/rllib_tests/regression_tests"
+cluster_config = "cluster.yaml"
+exec_cmd = """
+bash run.sh --ray-version={{ctx["ray_version"]}} \
+            --commit={{ctx["git_commit"]}} \
+            --ray-branch={{ctx["git_branch"]}}
+"""
+
+[rllib_stress_tests]
+base_dir = "release/rllib_tests/stress_tests"
+cluster_config = "cluster.yaml"
+exec_cmd = """
+bash run.sh --ray-version={{ctx["ray_version"]}} \
+            --commit={{ctx["git_commit"]}} \
+            --ray-branch={{ctx["git_branch"]}}
+"""
+
+[rllib_unit_gpu_tests]
+base_dir = "release/rllib_tests/unit_gpu_tests"
+cluster_config = "cluster.yaml"
+exec_cmd = """
+bash run.sh --ray-version={{ctx["ray_version"]}} \
+            --commit={{ctx["git_commit"]}} \
+            --ray-branch={{ctx["git_branch"]}}
+"""
