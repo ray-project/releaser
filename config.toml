@@ -11,7 +11,7 @@
 
 # ---------------------------------------------------
 # Regular job
-# --------------------------------------------------
+# ---------------------------------------------------
 [microbenchmark]
 base_dir = "release/microbenchmark"
 cluster_config = "cluster.yaml"
@@ -21,12 +21,13 @@ bash run.sh --ray-version={{ctx["ray_version"]}} \
             --ray-branch={{ctx["git_branch"]}}
 """
 
+
 # ---------------------------------------------------
 # Release tests.
-# --------------------------------------------------
+# ---------------------------------------------------
 # [long_running_tests]
-# base_dir = "ci/long_running_tests"
-# cluster_config = "ray-project/cluster.yaml"
+# base_dir = "release/long_running_tests"
+# cluster_config = "cluster.yaml"
 # exec_cmd = """
 # bash run.sh --ray-version={{ctx["ray_version"]}} \
 #             --commit={{ctx["git_commit"]}} \
@@ -42,6 +43,34 @@ bash run.sh --ray-version={{ctx["ray_version"]}} \
 
 #     [[long_running_tests.case]]
 #     workload = "many_tasks"
+
+#     [[long_running_tests.case]]
+#     workload = "actor_deaths"
+
+#     [[long_running_tests.case]]
+#     workload = "apex"
+
+#     [[long_running_tests.case]]
+#     workload = "impala"
+
+#     [[long_running_tests.case]]
+#     workload = "many_actor_tasks"
+
+#     [[long_running_tests.case]]
+#     workload = "many_drivers"
+
+#     [[long_running_tests.case]]
+#     workload = "many_ppo"
+
+#     [[long_running_tests.case]]
+#     workload = "many_tasks_serialized_ids"
+
+#     [[long_running_tests.case]]
+#     workload = "node_failures"
+
+#     [[long_running_tests.case]]
+#     workload = "pbt"
+
 
 [long_running_distributed]
 base_dir = "release/long_running_distributed_tests"
@@ -59,10 +88,32 @@ bash run.sh --ray-version={{ctx["ray_version"]}} \
     [[long_running_distributed.case]]
     workload = "horovod_test"
 
+# ---------------------------------------------------
+# Stress tests.
+# ---------------------------------------------------
+[stress_tests]
+base_dir = "release/stress_tests"
+cluster_config = "cluster.yaml"
+exec_cmd = """
+bash run.sh --ray-version={{ctx["ray_version"]}} \
+            --commit={{ctx["git_commit"]}} \
+            --ray-branch={{ctx["git_branch"]}} \
+            --workload={{ctx["workload"]}}
+"""
+
+    [[stress_tests.case]]
+    workload = "test_dead_actors"
+
+    [[stress_tests.case]]
+    workload = "test_many_tasks"
+
+    # [[stress_tests.case]]
+    # workload = "test_placement_group"
+
 
 # ---------------------------------------------------
 # Serve tests.
-# --------------------------------------------------
+# ---------------------------------------------------
 # [serve]
 # base_dir = "python/ray/serve/benchmarks"
 # cluster_config = "single.yaml"
