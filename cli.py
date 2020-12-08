@@ -218,10 +218,6 @@ def run_test(name: str, dry_run: bool = False, wait: bool = True):
         # Create a new anyscale session
         f"anyscale up --yes --cloud-name anyscale_default_cloud --config {cluster_config} {session_name}"
     )
-    execution_steps.append(
-        # Push all the files over to the remote session
-        f"anyscale push"
-    )
 
     exec_options = "" if wait else "--tmux"
     execution_steps.append(
