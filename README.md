@@ -28,3 +28,10 @@ Running precondition check...
 
 ... execution log omitted
 ```
+
+## Tips for adding a new release test 
+If you are iterating on a release test and wish to be able to change the `run.sh` or `config.yaml` file that 
+exists in the `ray` repository for a given file, you can change the file in the version of the `ray` repo that 
+the releaser tool clones to the `./ray` directory. This is useful because it removes the wait for a new
+wheel build to complete that would be required if you made the change on your branch of the `ray` repository
+and pushed it up.

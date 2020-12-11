@@ -107,7 +107,6 @@ def wheel_exists(ray_version, git_branch, git_commit):
     url = f"https://s3-us-west-2.amazonaws.com/ray-wheels/{git_branch}/{git_commit}/ray-{ray_version}-cp36-cp36m-manylinux2014_x86_64.whl"
     return requests.get(url).status_code == 200
 
-
 ######
 
 
@@ -216,10 +215,12 @@ def run_test(name: str, dry_run: bool = False, wait: bool = True):
         )
     execution_steps.append(
         # Create a new anyscale session
+        # Have cluster running 1.0.1.post1 at this point
         f"anyscale up --yes --cloud-name anyscale_default_cloud --config {cluster_config} {session_name}"
     )
 
     exec_options = "" if wait else "--tmux"
+    # Might want to swap this to run on every node (at least for the command to install ray.)
     execution_steps.append(
         f"anyscale exec --stop {exec_options} --session-name {session_name} -- {exec_cmd}"
     )

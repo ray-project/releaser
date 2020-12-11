@@ -25,51 +25,51 @@ bash run.sh --ray-version={{ctx["ray_version"]}} \
 # ---------------------------------------------------
 # Release tests.
 # ---------------------------------------------------
-# [long_running_tests]
-# base_dir = "release/long_running_tests"
-# cluster_config = "cluster.yaml"
-# exec_cmd = """
-# bash run.sh --ray-version={{ctx["ray_version"]}} \
-#             --commit={{ctx["git_commit"]}} \
-#             --ray-branch={{ctx["git_branch"]}} \
-#             --workload={{ctx["workload"]}}
-# """
+[long_running_tests]
+base_dir = "release/long_running_tests"
+cluster_config = "cluster.yaml"
+exec_cmd = """
+bash run.sh --ray-version={{ctx["ray_version"]}} \
+            --commit={{ctx["git_commit"]}} \
+            --ray-branch={{ctx["git_branch"]}} \
+            --workload={{ctx["workload"]}}
+"""
 
-#     [[long_running_tests.case]]
-#     workload = "serve"
+    [[long_running_tests.case]]
+    workload = "serve"
 
-#     [[long_running_tests.case]]
-#     workload = "serve_failure"
+    [[long_running_tests.case]]
+    workload = "serve_failure"
 
-#     [[long_running_tests.case]]
-#     workload = "many_tasks"
+    [[long_running_tests.case]]
+    workload = "many_tasks"
 
-#     [[long_running_tests.case]]
-#     workload = "actor_deaths"
+    [[long_running_tests.case]]
+    workload = "actor_deaths"
 
-#     [[long_running_tests.case]]
-#     workload = "apex"
+    [[long_running_tests.case]]
+    workload = "apex"
 
-#     [[long_running_tests.case]]
-#     workload = "impala"
+    [[long_running_tests.case]]
+    workload = "impala"
 
-#     [[long_running_tests.case]]
-#     workload = "many_actor_tasks"
+    [[long_running_tests.case]]
+    workload = "many_actor_tasks"
 
-#     [[long_running_tests.case]]
-#     workload = "many_drivers"
+    [[long_running_tests.case]]
+    workload = "many_drivers"
 
-#     [[long_running_tests.case]]
-#     workload = "many_ppo"
+    [[long_running_tests.case]]
+    workload = "many_ppo"
 
-#     [[long_running_tests.case]]
-#     workload = "many_tasks_serialized_ids"
+    [[long_running_tests.case]]
+    workload = "many_tasks_serialized_ids"
 
-#     [[long_running_tests.case]]
-#     workload = "node_failures"
+    [[long_running_tests.case]]
+    workload = "node_failures"
 
-#     [[long_running_tests.case]]
-#     workload = "pbt"
+    [[long_running_tests.case]]
+    workload = "pbt"
 
 
 [long_running_distributed]
