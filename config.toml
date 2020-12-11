@@ -25,21 +25,21 @@ bash run.sh --ray-version={{ctx["ray_version"]}} \
 # ---------------------------------------------------
 # Release tests.
 # ---------------------------------------------------
-# [long_running_tests]
-# base_dir = "release/long_running_tests"
-# cluster_config = "cluster.yaml"
-# exec_cmd = """
-# bash run.sh --ray-version={{ctx["ray_version"]}} \
-#             --commit={{ctx["git_commit"]}} \
-#             --ray-branch={{ctx["git_branch"]}} \
-#             --workload={{ctx["workload"]}}
-# """
+[long_running_tests]
+base_dir = "release/long_running_tests"
+cluster_config = "cluster.yaml"
+exec_cmd = """
+bash run.sh --ray-version={{ctx["ray_version"]}} \
+            --commit={{ctx["git_commit"]}} \
+            --ray-branch={{ctx["git_branch"]}} \
+            --workload={{ctx["workload"]}}
+"""
 
-#     [[long_running_tests.case]]
-#     workload = "serve"
+    [[long_running_tests.case]]
+    workload = "serve"
 
-#     [[long_running_tests.case]]
-#     workload = "serve_failure"
+    [[long_running_tests.case]]
+    workload = "serve_failure"
 
 #     [[long_running_tests.case]]
 #     workload = "many_tasks"
@@ -114,24 +114,24 @@ bash run.sh --ray-version={{ctx["ray_version"]}} \
 # ---------------------------------------------------
 # Serve tests.
 # ---------------------------------------------------
-# [serve]
-# base_dir = "python/ray/serve/benchmarks"
-# cluster_config = "single.yaml"
-# exec_cmd = """
-# python {{ctx["workload"]}}.py
-# """
-#     [[serve.case]]
-#     workload = "handle"
+[serve]
+base_dir = "python/ray/serve/benchmarks"
+cluster_config = "single.yaml"
+exec_cmd = """
+python {{ctx["workload"]}}.py
+"""
+    [[serve.case]]
+    workload = "handle"
 
-#     [[serve.case]]
-#     workload = "microbenchmark"
+    [[serve.case]]
+    workload = "microbenchmark"
 
-# [serve_cluster]
-# base_dir = "python/ray/serve/benchmarks"
-# cluster_config = "cluster.yaml"
-# exec_cmd = """
-# python scalability.py
-# """
+[serve-cluster]
+base_dir = "python/ray/serve/benchmarks"
+cluster_config = "cluster.yaml"
+exec_cmd = """
+python scalability.py
+"""
 
 
 # ---------------------------------------------------

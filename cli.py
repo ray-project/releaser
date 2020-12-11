@@ -179,7 +179,7 @@ def validate_tests():
 
 
 @app.command("suite:run")
-def run_test(name: str, dry_run: bool = False, wait: bool = True):
+def run_test(name: str, dry_run: bool = False, wait: bool = True, stop: bool = True):
     """Run a single test suite given `name`."""
     validate_tests()
 
@@ -220,8 +220,9 @@ def run_test(name: str, dry_run: bool = False, wait: bool = True):
     )
 
     exec_options = "" if wait else "--tmux"
+    exec_options += " --stop" if stop else " "
     execution_steps.append(
-        f"anyscale exec --stop {exec_options} --session-name {session_name} -- {exec_cmd}"
+        f"anyscale exec {exec_options} --session-name {session_name} -- {exec_cmd}"
     )
 
     color_print(f"🗺 Execution plan (within ray/{base_dir})")
