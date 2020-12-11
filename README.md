@@ -5,6 +5,10 @@ Releaser is a command line tool that runs Ray release tests. It uses Github Acti
 ## Scheduled runs
 You can view all the runs in the [actions tab](https://github.com/ray-project/releaser/actions) and the test sessions themselves in Anyscale project page. If you are an Anyscale engineer, you can find the bot account information in shared 1Password vault.
 
+The follow tests are ran periodically:
+- Daily: microbenchmark, serve-microbenchmark
+- Weekly (every Monday): serve cluster tests, rllib tests, pbt failure tests, long running tests.
+
 ## Running locally
 To add a new test, just edit the `config.toml` file. 
 
