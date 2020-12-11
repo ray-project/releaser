@@ -3,9 +3,9 @@ name: long-running-distributed
 on:
   push:
     branches: [ master ]
-    #schedule:
+  schedule:
     # Every Monday
-    #- cron: "0 0 * * 1"
+    - cron: "0 0 * * 1"
 
 jobs:
   build:
