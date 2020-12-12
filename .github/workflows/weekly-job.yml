@@ -16,6 +16,9 @@ jobs:
         suite:
           - serve-handle
           - serve-cluster
+          - rllib_regression_tests
+          - rllib_stress_tests
+          - rllib_unit_gpu_tests
     steps:
     - uses: actions/checkout@v2
     - name: Set up Python 3.8
@@ -31,4 +34,4 @@ jobs:
         ANYSCALE_CLI_TOKEN: ${{ secrets.ANYSCALE_CLI_TOKEN }}
         TEST_SUITE: ${{ matrix.suite }}
       run: |
-        python cli.py suite:run ${TEST_SUITE}
+        python cli.py suite:run ${TEST_SUITE} --no-wait
