@@ -1,11 +1,11 @@
 name: long-running-distributed
 
-on:
-  push:
-    branches: [ master ]
-  schedule:
-    # Every Monday
-    - cron: "0 0 * * 1"
+on: {}
+  # push:
+  #   branches: [ master ]
+  # schedule:
+  #   # Every Monday
+  #   - cron: "0 0 * * 1"
 
 jobs:
   build:
