@@ -14,6 +14,7 @@ import typer
 import jinja2
 import requests
 from dotenv import load_dotenv
+import ray
 
 # Load .env file for secrets and environment variables
 load_dotenv()
@@ -66,30 +67,28 @@ def _get_config():
     for name, suite in raw_config.items():
         # Simple test suite doesn't have many cases.
         # For example microbenchmark is a simple test.
-        is_simple_test_suite = "case" not in suite.keys()
         raw_exec_command = jinja2.Template(suite["exec_cmd"])
+        rendered_config[name] = suite
 
+        is_simple_test_suite = "case" not in suite.keys()
         if is_simple_test_suite:
-            rendered_config[name] = suite
-            rendered_config[name]["exec_cmd"] = raw_exec_command.render(
+            rendered_config[name]["workload_exec_cmds"] = { "basic": raw_exec_command.render(
                 ctx=global_context
-            )
+            )}
         else:
+            workload_cmds = {}
             for local_ctx in suite["case"]:
                 ctx = global_context.copy()
                 ctx.update(local_ctx)
-
+                workload_name = local_ctx["workload"]
                 # Construct data for a new test suite using case data
-                suite_name = "-".join([name] + list(local_ctx.values()))
                 rendered_exec_cmd = raw_exec_command.render(ctx=ctx)
 
-                # Add this new test suite the config
-                new_suite = suite.copy()
-                new_suite.pop("case")
-                new_suite["exec_cmd"] = rendered_exec_cmd
+                workload_cmds[workload_name] = rendered_exec_cmd
+            rendered_config[name]["workload_exec_cmds"] = workload_cmds
+            suite.pop("case")
 
-                rendered_config[suite_name] = new_suite
-
+        suite.pop("exec_cmd")
     return rendered_config
 
 
@@ -105,7 +104,7 @@ def cd(path):
 
 def wheel_exists(ray_version, git_branch, git_commit):
     url = f"https://s3-us-west-2.amazonaws.com/ray-wheels/{git_branch}/{git_commit}/ray-{ray_version}-cp36-cp36m-manylinux2014_x86_64.whl"
-    return requests.get(url).status_code == 200
+    return requests.head(url).status_code == 200
 
 ######
 
@@ -177,6 +176,13 @@ def validate_tests():
     pprint(config)
 
 
+@ray.remote(num_cpus=0)
+def run_case(base_dir, execution_steps):
+    with cd(os.path.join("ray", base_dir)):
+        for step in execution_steps:
+            run_shell_stream(step)
+
+
 @app.command("suite:run")
 def run_test(name: str, dry_run: bool = False, wait: bool = True, stop: bool = True):
     """Run a single test suite given `name`."""
@@ -189,11 +195,8 @@ def run_test(name: str, dry_run: bool = False, wait: bool = True, stop: bool = T
     suite_config = config[name]
     base_dir = suite_config["base_dir"]
     cluster_config = suite_config["cluster_config"]
-    exec_cmd = suite_config["exec_cmd"].strip()
 
     project_name = f"{PREFIX}-{name}"
-    # session_name format: gitsha-timestamp
-    session_name = global_context["git_commit"][:6] + f"-{int(time.time())}"
     known_project_id = None
 
     # TODO(simon): Replace this call with anyscale SDK
@@ -202,46 +205,62 @@ def run_test(name: str, dry_run: bool = False, wait: bool = True, stop: bool = T
     if len(prj_id):
         known_project_id = prj_id
 
-    execution_steps = []
+    global_execution_steps = []
     if known_project_id:
-        execution_steps.append(
+        global_execution_steps.append(
             # Re-instantiate the project because it's already registered in the past.
             f"echo 'project_id: {known_project_id}' > .anyscale.yaml"
         )
     else:
-        execution_steps.append(
+        global_execution_steps.append(
             # Create a new project
             f"rm -f .anyscale.yaml && anyscale init --name {project_name} --config {cluster_config}"
         )
-    execution_steps.append(
-        # Create a new anyscale session
-        # Have cluster running 1.0.1.post1 at this point
-        f"anyscale up --yes --cloud-name anyscale_default_cloud --config {cluster_config} {session_name}"
-    )
+    workload_exec_steps = {}
+    for workload_name, workload_cmd in suite_config["workload_exec_cmds"].items():
+        # session_name format: gitsha-timestamp
+        session_name = workload_name + global_context["git_commit"][:6] + f"-{int(time.time())}"
+        local_exec_steps = []
+        local_exec_steps.append(
+            # Create a new anyscale session
+            # Have cluster running 1.0.1.post1 at this point
+            f"anyscale up --yes --cloud-name anyscale_default_cloud --config {cluster_config} {session_name}"
+        )
 
-    exec_options = "" if wait else "--tmux"
-    # Might want to swap this to run on every node (at least for the command to install ray.)
-    exec_options += " --stop" if stop else " "
-    execution_steps.append(
-        f"anyscale exec {exec_options} --session-name {session_name} -- {exec_cmd}"
-    )
+        exec_options = "" if wait else "--tmux"
+        # Might want to swap this to run on every node (at least for the command to install ray.)
+        exec_options += " --stop" if stop else " "
+        local_exec_steps.append(
+            f"anyscale exec {exec_options} --session-name {session_name} -- {workload_cmd}"
+        )
+        workload_exec_steps[workload_name] = local_exec_steps
 
     color_print(f"🗺 Execution plan (within ray/{base_dir})")
-    for step in execution_steps:
+    for step in global_execution_steps:
         typer.echo("\t" + step)
+    typer.echo("\tExecuting the following workloads:")
+    for name, workload_cmds in workload_exec_steps.items():
+        typer.echo(f"\t{name}:")
+        for command in workload_cmds:
+            typer.echo(f"\t\t{command}")
 
     if dry_run:
         return
     else:
         color_print(
-            "🏎 Execution the command now. (Tip: --dry-run to skip execution, --no-wait for async execution)"
+            "🏎 Executing the commands now. (Tip: --dry-run to skip execution, --no-wait for async execution)"
         )
 
-    with cd(os.path.join("ray", base_dir)):
-        for step in execution_steps:
+    for command in global_execution_steps:
+        with cd(os.path.join("ray", base_dir)):
+            run_shell_stream(command)
 
-            run_shell_stream(step)
+    jobs = []
+    for workload_cmds in workload_exec_steps.values():
+        jobs.append(run_case.remote(base_dir, workload_cmds))
+    ray.get(jobs)
 
-
+    
 if __name__ == "__main__":
+    ray.init()
     app()
