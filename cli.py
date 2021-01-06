@@ -72,9 +72,9 @@ def _get_config():
 
         is_simple_test_suite = "case" not in suite.keys()
         if is_simple_test_suite:
-            rendered_config[name]["workload_exec_cmds"] = { "basic": raw_exec_command.render(
-                ctx=global_context
-            )}
+            rendered_config[name]["workload_exec_cmds"] = {
+                "basic": raw_exec_command.render(ctx=global_context)
+            }
         else:
             workload_cmds = {}
             for local_ctx in suite["case"]:
@@ -105,6 +105,7 @@ def cd(path):
 def wheel_exists(ray_version, git_branch, git_commit):
     url = f"https://s3-us-west-2.amazonaws.com/ray-wheels/{git_branch}/{git_commit}/ray-{ray_version}-cp36-cp36m-manylinux2014_x86_64.whl"
     return requests.head(url).status_code == 200
+
 
 ######
 
@@ -219,7 +220,12 @@ def run_test(name: str, dry_run: bool = False, wait: bool = True, stop: bool = T
     workload_exec_steps = {}
     for workload_name, workload_cmd in suite_config["workload_exec_cmds"].items():
         # session_name format: gitsha-timestamp
-        session_name = workload_name + global_context["git_commit"][:6] + f"-{int(time.time())}"
+        session_name = (
+            workload_name
+            + "-"
+            + global_context["git_commit"][:6]
+            + f"-{int(time.time())}"
+        )
         local_exec_steps = []
         local_exec_steps.append(
             # Create a new anyscale session
@@ -255,12 +261,12 @@ def run_test(name: str, dry_run: bool = False, wait: bool = True, stop: bool = T
         with cd(os.path.join("ray", base_dir)):
             run_shell_stream(command)
 
+    ray.init()
     jobs = []
     for workload_cmds in workload_exec_steps.values():
         jobs.append(run_case.remote(base_dir, workload_cmds))
     ray.get(jobs)
 
-    
+
 if __name__ == "__main__":
-    ray.init()
     app()

@@ -1,11 +1,11 @@
 name: weekly-job
 
-on: {}
+on:
   # push:
   #   branches: [ master ]
-  # schedule:
-  #   # Every Monday
-  #   - cron: "0 0 * * 1"
+  schedule:
+    # Every Monday
+    - cron: "0 0 * * 1"
 
 
 jobs:
@@ -14,7 +14,6 @@ jobs:
     strategy:
       matrix:
         suite:
-          - serve-handle
           - serve-cluster
           - rllib_regression_tests
           - rllib_stress_tests

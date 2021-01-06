@@ -1,30 +1,15 @@
 name: long-running-tests
 
-on: {}
+on:
   # push:
   #   branches: [ master ]
-  # schedule:
-  #   # Every Monday
-  #   - cron: "0 0 * * 1"
+  schedule:
+    # Every Monday
+    - cron: "0 0 * * 1"
 
 jobs:
   build:
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        suite:
-          - serve
-          - serve_failure
-          - many_tasks
-          - actor_deaths
-          - apex
-          - impala
-          - many_actor_tasks
-          - many_drivers
-          - many_ppo
-          - many_tasks_serialized_ids
-          - node_failures
-          - pbt
     steps:
     - uses: actions/checkout@v2
     - name: Set up Python 3.8
@@ -39,6 +24,5 @@ jobs:
       env:
         ANYSCALE_HOST: https://anyscale.dev
         ANYSCALE_CLI_TOKEN: ${{ secrets.ANYSCALE_CLI_TOKEN }}
-        TEST_SUITE: ${{ matrix.suite }}
       run: |
-        python cli.py suite:run long_running_tests-${TEST_SUITE} --no-wait
+        python cli.py suite:run long_running_tests --no-wait

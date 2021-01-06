@@ -15,7 +15,7 @@ jobs:
       matrix:
         suite:
           - microbenchmark
-          - serve-microbenchmark
+          - serve
     steps:
     - uses: actions/checkout@v2
     - name: Set up Python 3.8
