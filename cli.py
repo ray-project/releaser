@@ -1,32 +1,34 @@
 import os
-from urllib.parse import urlparse
 import subprocess
-from functools import partial
-from typing import Optional, Dict
-from contextlib import contextmanager
+import threading
 import time
+from concurrent.futures import ProcessPoolExecutor
+from contextlib import contextmanager
+from functools import partial
 from pprint import pprint
-import json
+from typing import Dict, Optional
 
-import yaml
-import toml
-import typer
 import jinja2
 import requests
+import toml
+import typer
+import yaml
+from anyscale.api import get_api_client
+from anyscale.credentials import load_credentials
+from anyscale.sdk.anyscale_client.sdk import AnyscaleSDK
 from dotenv import load_dotenv
-import ray
 
-# Load .env file for secrets and environment variables
 load_dotenv()
 
+
 ###### Global Variables
+PREFIX = os.environ.get("RELEASER_PREFIX", "release-automation")
+CLI_TOKEN = os.environ.get("ANYSCALE_CLI_TOKEN") or load_credentials()
+
 app = typer.Typer()
 global_context: Dict[str, str] = dict()
-PREFIX = os.environ.get("RELEASER_PREFIX", "release-automation")
-CLI_TOKEN = (
-    os.environ.get("ANYSCALE_CLI_TOKEN")
-    or json.load(open(os.path.expanduser("~/.anyscale/credentials.json")))["cli_token"]
-)
+anyscale_sdk = AnyscaleSDK(CLI_TOKEN)
+ansycale_api_client = get_api_client()
 ######
 
 ###### Helper Functions
@@ -115,7 +117,8 @@ def wheel_exists(ray_version, git_branch, git_commit):
 def ensure_repo(
     git_branch: str = "master",
     git_commit: Optional[str] = None,
-    git_org: Optional[str] = "ray-project",
+    git_org: str = "ray-project",
+    git_skip_checkout: bool = False,
 ):
     color_print("Running precondition check...")
 
@@ -124,25 +127,30 @@ def ensure_repo(
         run_shell(f"git clone https://github.com/{git_org}/ray.git")
 
     with cd("ray"):
-        color_print(f"💰 Checking out {git_branch}")
-        run_shell(
-            f"git fetch && git checkout {git_branch} && git pull origin {git_branch}"
-        )
-        if git_commit:
-            run_shell(f"git checkout {git_commit}")
+        if git_skip_checkout:
+            color_print("💰 Skipping git checkout")
         else:
-            # We want to find the latest commit with wheels available
-            for commit in run_shell(
-                r'git log --oneline -20 --pretty=format:"%H"'
-            ).stdout.splitlines(keepends=False):
-                commit = commit.strip()
-                run_shell(f"git checkout {commit}")
-                exec(run_shell('grep "__version__ = " python/ray/__init__.py').stdout)
-                if wheel_exists(locals()["__version__"], git_branch, commit):
-                    break
+            color_print(f"💰 Checking out {git_branch}")
+            run_shell(
+                f"git fetch && git checkout {git_branch} && git pull origin {git_branch}"
+            )
+            if git_commit:
+                run_shell(f"git checkout {git_commit}")
             else:
-                color_print("Can't find a commit with wheels available!")
-                raise typer.Exit(1)
+                # We want to find the latest commit with wheels available
+                for commit in run_shell(
+                    r'git log --oneline -20 --pretty=format:"%H"'
+                ).stdout.splitlines(keepends=False):
+                    commit = commit.strip()
+                    run_shell(f"git checkout {commit}")
+                    exec(
+                        run_shell('grep "__version__ = " python/ray/__init__.py').stdout
+                    )
+                    if wheel_exists(locals()["__version__"], git_branch, commit):
+                        break
+                else:
+                    color_print("Can't find a commit with wheels available!")
+                    raise typer.Exit(1)
 
         latest_commit = run_shell(
             r'git --no-pager log -1 --oneline --no-color --pretty=format:"%h - %an, %cr: %s"'
@@ -173,22 +181,45 @@ def validate_tests():
             with open(cluster_file) as f:
                 yaml.safe_load(f)
 
-    color_print("😃 Validation successful!")
-    pprint(config)
+    color_print("😃 Validation successful! Listing all suites.")
+
+    test_suite = {
+        key: list(value["workload_exec_cmds"].keys()) for key, value in config.items()
+    }
+    pprint(test_suite)
 
 
-@ray.remote(num_cpus=0)
+def _create_or_get_project_id(project_name: str):
+    known_project_id = None
+
+    my_user_id = ansycale_api_client.get_user_info_api_v2_userinfo_get().result.id
+    project_id_found = anyscale_sdk.search_projects(
+        projects_query={"name": {"equals": project_name}}
+    ).results
+    for proj in project_id_found:
+        if proj.creator_id == my_user_id:
+            known_project_id = proj.id
+    if known_project_id is None:
+        known_project_id = anyscale_sdk.create_project({"name": project_name}).result.id
+    return known_project_id
+
+
 def run_case(base_dir, execution_steps):
+    print(f"Thread {threading.get_ident()} running {execution_steps}")
     with cd(os.path.join("ray", base_dir)):
         for step in execution_steps:
             run_shell_stream(step)
 
 
 @app.command("suite:run")
-def run_test(name: str, dry_run: bool = False, wait: bool = True, stop: bool = True):
+def run_test(
+    name: str,
+    wait: bool = True,
+    stop: bool = True,
+):
     """Run a single test suite given `name`."""
+    # Validation
     validate_tests()
-
     config = _get_config()
     all_suites = list(config.keys())
     assert name in all_suites, f"{name} not found. Available suites are {all_suites}."
@@ -197,26 +228,8 @@ def run_test(name: str, dry_run: bool = False, wait: bool = True, stop: bool = T
     base_dir = suite_config["base_dir"]
     cluster_config = suite_config["cluster_config"]
 
-    project_name = f"{PREFIX}-{name}"
-    known_project_id = None
+    project_id = _create_or_get_project_id(project_name=f"{PREFIX}-{name}")
 
-    # TODO(simon): Replace this call with anyscale SDK
-    get_prj_id_cmd = f"""anyscale list projects --json | jq --raw-output '.[] | select(.name=="{project_name}") | .url  | split("/") | .[-1]'""".strip()
-    prj_id = run_shell(get_prj_id_cmd).stdout.strip()
-    if len(prj_id):
-        known_project_id = prj_id
-
-    global_execution_steps = []
-    if known_project_id:
-        global_execution_steps.append(
-            # Re-instantiate the project because it's already registered in the past.
-            f"echo 'project_id: {known_project_id}' > .anyscale.yaml"
-        )
-    else:
-        global_execution_steps.append(
-            # Create a new project
-            f"rm -f .anyscale.yaml && anyscale init --name {project_name} --config {cluster_config}"
-        )
     workload_exec_steps = {}
     for workload_name, workload_cmd in suite_config["workload_exec_cmds"].items():
         # session_name format: gitsha-timestamp
@@ -230,7 +243,7 @@ def run_test(name: str, dry_run: bool = False, wait: bool = True, stop: bool = T
         local_exec_steps.append(
             # Create a new anyscale session
             # Have cluster running 1.0.1.post1 at this point
-            f"anyscale up --yes --cloud-name anyscale_default_cloud --config {cluster_config} {session_name}"
+            f"anyscale _up --cloud-name anyscale_default_cloud --config {cluster_config} {session_name}"
         )
 
         exec_options = "" if wait else "--tmux"
@@ -241,31 +254,26 @@ def run_test(name: str, dry_run: bool = False, wait: bool = True, stop: bool = T
         )
         workload_exec_steps[workload_name] = local_exec_steps
 
+    global_execution_steps = [
+        # Re-instantiate the project because it's already registered in the past.
+        f"echo 'project_id: {project_id}' > .anyscale.yaml",
+    ]
+
     color_print(f"🗺 Execution plan (within ray/{base_dir})")
     for step in global_execution_steps:
         typer.echo("\t" + step)
-    typer.echo("\tExecuting the following workloads:")
     for name, workload_cmds in workload_exec_steps.items():
         typer.echo(f"\t{name}:")
         for command in workload_cmds:
             typer.echo(f"\t\t{command}")
 
-    if dry_run:
-        return
-    else:
-        color_print(
-            "🏎 Executing the commands now. (Tip: --dry-run to skip execution, --no-wait for async execution)"
-        )
-
+    color_print(f"🚀 Kicking off")
     for command in global_execution_steps:
         with cd(os.path.join("ray", base_dir)):
             run_shell_stream(command)
-
-    ray.init()
-    jobs = []
-    for workload_cmds in workload_exec_steps.values():
-        jobs.append(run_case.remote(base_dir, workload_cmds))
-    ray.get(jobs)
+    with ProcessPoolExecutor(max_workers=len(workload_exec_steps)) as executor:
+        for workload_cmds in workload_exec_steps.values():
+            executor.submit(run_case, base_dir, workload_cmds)
 
 
 if __name__ == "__main__":

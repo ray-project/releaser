@@ -2,15 +2,36 @@
 
 Releaser is a command line tool that runs Ray release tests. It uses Github Action to schedule periodic runs and kick off the tests on Ansycale.
 
+## Common Workflows
+
+### Configuring commit
+
+- Run it with Ray nightly wheels: `python cli.py suite:run microbenchmark`. Releaser will find the latest commit with nightly wheel.
+- Run it with a given branch: `python cli.py --git-branch releases/1.1.0 suite:run microbenchmark`. Releaser will find the latest commit in that branch that contains a wheel.
+- Run it with your own fork: `python cli.py --git-org your-user-name suite:run microbenchmark`. Releaser will clone the specified Ray repo instead of the ray-project's repo.
+- Run it with a given commit: `python cli.py --git-commit XXX-COMMIT-SHA suite:run microbenchmark`. Releaser will skip the wheel check
+- Disable any sort of auto git-checking: `python cli.py --git-skip-checkout suite:run microbenchmark`. Releaser won't mess with git at all. With this config, you can modify the cloned repo and re-run releaser using the modified Ray repo content.
+
+### Configuring execution
+
+- List all tests: `python cli.py suite:validate`.
+- Run it and wait for the result: `python cli.py suite:run microbenchmark`.
+- Run it and don't wait for the result: `python cli.py suite:run --no-wait microbenchmark`.
+- By default, releaser will shutdown the session after a command finishes (regardless of the exit status of that command). You can override this behavior with `python cli.py suite:run --no-stop microbenchmark`.
+- By default, releaser will run all test cases in parallel for a given suite. To limit the specific case(s) to be run, you can modify the `config.toml` by commenting out test cases you don't want to be ran.
+
 ## Scheduled runs
+
 You can view all the runs in the [actions tab](https://github.com/ray-project/releaser/actions) and the test sessions themselves in Anyscale project page. If you are an Anyscale engineer, you can find the bot account information in shared 1Password vault.
 
 The follow tests are ran periodically:
+
 - Daily: microbenchmark, serve-microbenchmark
 - Weekly (every Monday): serve cluster tests, rllib tests, pbt failure tests, long running tests.
 
 ## Running locally
-To add a new test, just edit the `config.toml` file. 
+
+To add a new test, just edit the `config.toml` file.
 
 ```
 $ python cli.py --help
@@ -39,7 +60,7 @@ Options:
   --wait / --no-wait        [default: True]
   --stop / --no-stop        [default: True]
   --help                    Show this message and exit.
-  
+
 $ python cli.py suite:run microbenchmark
 
 Running precondition check...
@@ -61,10 +82,10 @@ Running precondition check...
 ... execution log omitted
 ```
 
+## Tips for adding a new release test
 
-## Tips for adding a new release test 
-If you are iterating on a release test and wish to be able to change the `run.sh` or `config.yaml` file that 
-exists in the `ray` repository for a given file, you can change the file in the version of the `ray` repo that 
+If you are iterating on a release test and wish to be able to change the `run.sh` or `config.yaml` file that
+exists in the `ray` repository for a given file, you can change the file in the version of the `ray` repo that
 the releaser tool clones to the `./ray` directory. This is useful because it removes the wait for a new
 wheel build to complete that would be required if you made the change on your branch of the `ray` repository
 and pushed it up.
