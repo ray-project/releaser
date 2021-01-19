@@ -22,7 +22,7 @@ load_dotenv()
 ###### Global Variables
 app = typer.Typer()
 global_context: Dict[str, str] = dict()
-PREFIX = "release-automation"
+PREFIX = os.environ.get("RELEASER_PREFIX", "release-automation")
 CLI_TOKEN = (
     os.environ.get("ANYSCALE_CLI_TOKEN")
     or json.load(open(os.path.expanduser("~/.anyscale/credentials.json")))["cli_token"]
