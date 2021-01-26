@@ -42,19 +42,20 @@ for proj in all_projects:
                 (sess.id),
                 (sess.name),
                 (sess.state),
+                (sess.pending_state),
             ]
         )
 
 print(
     tabulate(
-        table, headers=["proj.id", "proj.name", "sess.id", "sess.name", "sess.state"]
+        table, headers=["proj.id", "proj.name", "sess.id", "sess.name", "sess.state", "sess.pending_state"]
     )
 )
 
 if len(table) > 0:
     response = input("Terminate sessions? [Y/n]").lower().strip()
     if response == "y":
-        for proj_id, _, sess_id, _, _ in table:
+        for proj_id, _, sess_id, *_ in table:
             resp = anyscale_sdk.terminate_session(sess_id, {})
             print(resp)
 

@@ -243,7 +243,7 @@ def run_test(
         local_exec_steps.append(
             # Create a new anyscale session
             # Have cluster running 1.0.1.post1 at this point
-            f"anyscale _up --cloud-name anyscale_default_cloud --config {cluster_config} {session_name}"
+            f"anyscale up --cloud-name anyscale_default_cloud --config {cluster_config} {session_name}"
         )
 
         exec_options = "" if wait else "--tmux"
