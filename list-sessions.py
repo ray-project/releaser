@@ -12,8 +12,12 @@ app = Typer()
 
 
 @app.command("list")
-def do_list(interactive: bool = True, verbose: bool = False):
+def do_list(
+    interactive: bool = True, verbose: bool = False, exclude_stopped: bool = True
+):
     load_dotenv()
+    if interactive:
+        verbose = True
     token = os.environ.get("ANYSCALE_CLI_TOKEN") or load_credentials()
     anyscale_sdk = AnyscaleSDK(token)
 
@@ -40,7 +44,10 @@ def do_list(interactive: bool = True, verbose: bool = False):
             has_more = paging_token is not None
 
         for sess in sessions:
-            if sess.state in {"Terminated"}:
+            ignore_states = {"Terminated"}
+            if exclude_stopped:
+                ignore_states.add("Stopped")
+            if sess.state in ignore_states:
                 continue
 
             table.append(

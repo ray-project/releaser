@@ -120,8 +120,9 @@ cluster_config = "single.yaml"
 exec_cmd = """
 python {{ctx["workload"]}}.py
 """
-    [[serve.case]]
-    workload = "handle"
+    # skipping due to hanging
+    # [[serve.case]]
+    # workload = "handle"
 
     [[serve.case]]
     workload = "microbenchmark"

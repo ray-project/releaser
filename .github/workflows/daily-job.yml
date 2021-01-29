@@ -1,8 +1,8 @@
 name: daily-job
 
 on:
-  push:
-    branches: [ master ]
+  # push:
+  #   branches: [ master ]
   schedule:
     #  Everyday
     - cron: "0 0 * * *"
