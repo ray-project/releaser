@@ -1,4 +1,5 @@
 import os
+import sys
 
 from anyscale.credentials import load_credentials
 from anyscale.sdk.anyscale_client.sdk import AnyscaleSDK
@@ -67,25 +68,28 @@ def do_list(
                 ]
             )
 
-    print(
-        tabulate(
-            table,
-            headers=[
-                "proj.id",
-                "proj.name",
-                "sess.id",
-                "sess.name",
-                "sess.state",
-                "sess.pending_state",
-            ]
-            if verbose
-            else [
-                "proj.name",
-                "sess.name",
-                "sess.state",
-            ],
+    if len(table) > 0:
+        print(
+            tabulate(
+                table,
+                headers=[
+                    "proj.id",
+                    "proj.name",
+                    "sess.id",
+                    "sess.name",
+                    "sess.state",
+                    "sess.pending_state",
+                ]
+                if verbose
+                else [
+                    "proj.name",
+                    "sess.name",
+                    "sess.state",
+                ],
+            )
         )
-    )
+    else:
+        print("No session found", file=sys.stderr)
 
     if len(table) > 0 and interactive:
         response = input("Terminate sessions? [Y/n]").lower().strip()

@@ -18,7 +18,11 @@ if not ((9 <= current_time_pacific.hour < 17) and (current_time_pacific.weekday(
 
 load_dotenv()
 
-markdown_text = "Anyscale Session Status \n```\n" + sys.stdin.read() + "```\n"
+inp = sys.stdin.read()
+if len(inp.strip()) <= 3:
+    print("Empty input, skipping")
+    sys.exit(0)
+markdown_text = "Anyscale Session Status \n```\n" + inp + "```\n"
 
 slack_url = os.environ["SLACK_WEBHOOK"]
 slack_channnel = os.environ.get("SLACK_CHANNEL_OVERRIDE", "#simon-bot-testing")
