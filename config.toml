@@ -134,6 +134,25 @@ exec_cmd = """
 python scalability.py
 """
 
+# ---------------------------------------------------
+# Tune tests.
+# ---------------------------------------------------
+[tune_scalability_tests]
+base_dir = "release/tune_tests/scalability_tests"
+cluster_config = "cluster.yaml"
+exec_cmd = """
+bash run.sh --ray-version={{ctx["ray_version"]}} \
+            --commit={{ctx["git_commit"]}} \
+            --ray-branch={{ctx["git_branch"]}} \
+            --workload={{ctx["workload"]}}
+"""
+
+    [[tune_scalability_tests.case]]
+    workload = "test_result_buffering"
+
+    # [[stress_tests.case]]
+    # workload = "test_placement_group"
+
 
 # ---------------------------------------------------
 # RLlib tests.
@@ -164,3 +183,62 @@ bash run.sh --ray-version={{ctx["ray_version"]}} \
             --commit={{ctx["git_commit"]}} \
             --ray-branch={{ctx["git_branch"]}}
 """
+
+# ---------------------------------------------------
+# XGBoost tests.
+# ---------------------------------------------------
+[xgboost_tests]
+base_dir = "release/xgboost_tests"
+cluster_config = "cluster_cpu_small.yaml"
+exec_cmd = """
+bash run.sh --nodes={{ctx["nodes"]}} \
+            --ray-version={{ctx["ray_version"]}} \
+            --commit={{ctx["git_commit"]}} \
+            --ray-branch={{ctx["git_branch"]}} \
+            --workload={{ctx["workload"]}}
+"""
+
+    [[xgboost_tests.case]]
+    cluster_config = "cluster_cpu_small.yaml"
+    nodes = 4
+    workload = "distributed_api_test"
+
+    [[xgboost_tests.case]]
+    cluster_config = "cluster_cpu_small.yaml"
+    nodes = 4
+    workload = "train_small"
+
+    [[xgboost_tests.case]]
+    cluster_config = "cluster_cpu_small.yaml"
+    nodes = 4
+    workload = "tune_small"
+
+    [[xgboost_tests.case]]
+    cluster_config = "cluster_cpu_small.yaml"
+    nodes = 4
+    workload = "ft_small_non_elastic"
+
+    [[xgboost_tests.case]]
+    cluster_config = "cluster_cpu_small.yaml"
+    nodes = 4
+    workload = "ft_small_elastic"
+
+    [[xgboost_tests.case]]
+    cluster_config = "cluster_cpu_moderate.yaml"
+    nodes = 32
+    workload = "train_moderate"
+
+    [[xgboost_tests.case]]
+    cluster_config = "cluster_cpu_moderate.yaml"
+    nodes = 32
+    workload = "tune_4x32"
+
+    [[xgboost_tests.case]]
+    cluster_config = "cluster_cpu_moderate.yaml"
+    nodes = 32
+    workload = "tune_32x4"
+
+    [[xgboost_tests.case]]
+    cluster_config = "cluster_gpu_small.yaml"
+    nodes = 5
+    workload = "train_gpu"

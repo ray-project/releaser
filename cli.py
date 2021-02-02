@@ -79,6 +79,7 @@ def _get_config():
             }
         else:
             workload_cmds = {}
+            workload_configs = {}
             for local_ctx in suite["case"]:
                 ctx = global_context.copy()
                 ctx.update(local_ctx)
@@ -87,7 +88,9 @@ def _get_config():
                 rendered_exec_cmd = raw_exec_command.render(ctx=ctx)
 
                 workload_cmds[workload_name] = rendered_exec_cmd
+                workload_configs[workload_name] = local_ctx
             rendered_config[name]["workload_exec_cmds"] = workload_cmds
+            rendered_config[name]["workload_configs"] = workload_configs
             suite.pop("case")
 
         suite.pop("exec_cmd")
@@ -176,7 +179,7 @@ def validate_tests():
 
             assert os.path.exists(
                 cluster_file
-            ), f"Validating {name} failed: cluster config file {cluster_file} doesn't exist"
+            ), f"Validating {name} failed: cluster config file {os.path.abspath(cluster_file)} doesn't exist"
 
             with open(cluster_file) as f:
                 yaml.safe_load(f)
@@ -234,6 +237,11 @@ def run_test(
     workload_exec_steps = {}
     cleanup_steps = []
     for workload_name, workload_cmd in suite_config["workload_exec_cmds"].items():
+        workload_config = suite_config["workload_configs"][workload_name]
+
+        workload_cluster_config = workload_config.get(
+            "cluster_config", cluster_config)
+
         # session_name format: gitsha-timestamp
         session_name = (
             workload_name
@@ -244,7 +252,7 @@ def run_test(
         local_exec_steps = []
         local_exec_steps.append(
             # Create a new anyscale session
-            f"anyscale up --cloud-name anyscale_default_cloud --config {cluster_config} {session_name}"
+            f"anyscale up --cloud-name anyscale_default_cloud --config {workload_cluster_config} {session_name}"
         )
 
         exec_options = "" if wait else "--tmux"
