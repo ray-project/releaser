@@ -15,6 +15,7 @@ Releaser is a command line tool that runs Ray release tests. It uses Github Acti
 ### Configuring execution
 
 - List all tests: `python cli.py suite:validate`.
+- Dryrun it with `python cli.py suite:run --dryrun microbenchmark`.
 - Run it and wait for the result: `python cli.py suite:run microbenchmark`.
 - Run it and don't wait for the result: `python cli.py suite:run --no-wait microbenchmark`.
 - By default, releaser will shutdown the session after a command finishes (regardless of the exit status of that command). You can override this behavior with `python cli.py suite:run --no-stop microbenchmark`.

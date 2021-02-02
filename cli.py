@@ -216,6 +216,7 @@ def run_test(
     name: str,
     wait: bool = True,
     stop: bool = True,
+    dryrun: bool = False,
 ):
     """Run a single test suite given `name`."""
     # Validation
@@ -231,6 +232,7 @@ def run_test(
     project_id = _create_or_get_project_id(project_name=f"{PREFIX}-{name}")
 
     workload_exec_steps = {}
+    cleanup_steps = []
     for workload_name, workload_cmd in suite_config["workload_exec_cmds"].items():
         # session_name format: gitsha-timestamp
         session_name = (
@@ -242,7 +244,6 @@ def run_test(
         local_exec_steps = []
         local_exec_steps.append(
             # Create a new anyscale session
-            # Have cluster running 1.0.1.post1 at this point
             f"anyscale up --cloud-name anyscale_default_cloud --config {cluster_config} {session_name}"
         )
 
@@ -253,6 +254,9 @@ def run_test(
             f"anyscale exec {exec_options} --session-name {session_name} -- {workload_cmd}"
         )
         workload_exec_steps[workload_name] = local_exec_steps
+
+        if wait and stop:
+            cleanup_steps.append(f"anyscale down --terminate {session_name} || true")
 
     global_execution_steps = [
         # Re-instantiate the project because it's already registered in the past.
@@ -267,13 +271,24 @@ def run_test(
         for command in workload_cmds:
             typer.echo(f"\t\t{command}")
 
+    if dryrun:
+        raise typer.Exit()
+
     color_print(f"🚀 Kicking off")
     for command in global_execution_steps:
         with cd(os.path.join("ray", base_dir)):
             run_shell_stream(command)
-    with ProcessPoolExecutor(max_workers=len(workload_exec_steps)) as executor:
-        for workload_cmds in workload_exec_steps.values():
-            executor.submit(run_case, base_dir, workload_cmds)
+    try:
+        with ProcessPoolExecutor(max_workers=len(workload_exec_steps)) as executor:
+            for workload_cmds in workload_exec_steps.values():
+                executor.submit(run_case, base_dir, workload_cmds)
+    finally:
+        with cd(os.path.join("ray", base_dir)):
+            for command in cleanup_steps:
+                try:
+                    run_shell_stream(command)
+                except:
+                    pass
 
 
 if __name__ == "__main__":
