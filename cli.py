@@ -217,6 +217,7 @@ def run_case(base_dir, execution_steps):
 @app.command("suite:run")
 def run_test(
     name: str,
+    workload: Optional[str] = None,
     wait: bool = True,
     stop: bool = True,
     dryrun: bool = False,
@@ -237,6 +238,9 @@ def run_test(
     workload_exec_steps = {}
     cleanup_steps = []
     for workload_name, workload_cmd in suite_config["workload_exec_cmds"].items():
+        if workload and workload_name != workload:
+            continue
+
         workload_config = suite_config["workload_configs"][workload_name]
 
         workload_cluster_config = workload_config.get(
@@ -265,6 +269,9 @@ def run_test(
 
         if wait and stop:
             cleanup_steps.append(f"anyscale down --terminate {session_name} || true")
+
+    if workload and not workload_exec_steps:
+        raise ValueError(f"Workload {workload} not found in test suite {name}")
 
     global_execution_steps = [
         # Re-instantiate the project because it's already registered in the past.

@@ -139,19 +139,49 @@ python scalability.py
 # ---------------------------------------------------
 [tune_scalability_tests]
 base_dir = "release/tune_tests/scalability_tests"
-cluster_config = "cluster.yaml"
+cluster_config = "cluster_1x16.yaml"
 exec_cmd = """
-bash run.sh --ray-version={{ctx["ray_version"]}} \
+bash run.sh --nodes={{ctx["nodes"]}} \
+            --ray-version={{ctx["ray_version"]}} \
             --commit={{ctx["git_commit"]}} \
             --ray-branch={{ctx["git_branch"]}} \
             --workload={{ctx["workload"]}}
 """
 
     [[tune_scalability_tests.case]]
-    workload = "test_result_buffering"
+    cluster_config = "cluster_1x16.yaml"
+    nodes = 1
+    workload = "test_bookkeeping_overhead"
 
-    # [[stress_tests.case]]
-    # workload = "test_placement_group"
+    [[tune_scalability_tests.case]]
+    cluster_config = "cluster_16x64.yaml"
+    nodes = 16
+    workload = "test_result_throughput_cluster"
+
+    [[tune_scalability_tests.case]]
+    cluster_config = "cluster_1x96.yaml"
+    nodes = 1
+    workload = "test_result_throughput_single_node"
+
+    [[tune_scalability_tests.case]]
+    cluster_config = "cluster_200x2.yaml"
+    nodes = 200
+    workload = "test_network_overhead"
+
+    [[tune_scalability_tests.case]]
+    cluster_config = "cluster_1x32_hd.yaml"
+    nodes = 1
+    workload = "test_long_running_large_checkpoints"
+
+    [[tune_scalability_tests.case]]
+    cluster_config = "cluster_16x64_data.yaml"
+    nodes = 16
+    workload = "test_xgboost_sweep"
+
+    [[tune_scalability_tests.case]]
+    cluster_config = "cluster_16x2.yaml"
+    nodes = 16
+    workload = "test_durable_trainable"
 
 
 # ---------------------------------------------------
