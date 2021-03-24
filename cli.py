@@ -23,6 +23,8 @@ load_dotenv()
 
 ###### Global Variables
 PREFIX = os.environ.get("RELEASER_PREFIX", "release-automation")
+# Update the local ray dir if you want to test local changes to release tests
+LOCAL_RAY_DIR = os.environ.get("RELEASER_LOCAL_RAY_DIR", "ray")
 CLI_TOKEN = os.environ.get("ANYSCALE_CLI_TOKEN") or load_credentials()
 
 app = typer.Typer()
@@ -33,18 +35,19 @@ ansycale_api_client = get_api_client()
 
 ###### Helper Functions
 def run_shell(*args, **kwargs):
-    defualt_kwargs = dict(
+    default_kwargs = dict(
         shell=True,
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,
         encoding="utf-8",
         executable="/bin/bash",
+        env=os.environ,
     )
-    defualt_kwargs.update(kwargs)
+    default_kwargs.update(kwargs)
 
     proc = subprocess.run(
         *args,
-        **defualt_kwargs,
+        **default_kwargs,
     )
     if proc.returncode != 0:
         typer.secho(f"Failed to run {args}", fg=typer.colors.BRIGHT_RED)
@@ -88,13 +91,22 @@ def _get_config():
                 rendered_exec_cmd = raw_exec_command.render(ctx=ctx)
 
                 workload_cmds[workload_name] = rendered_exec_cmd
-                workload_configs[workload_name] = local_ctx
+                workload_configs[workload_name] = ctx
             rendered_config[name]["workload_exec_cmds"] = workload_cmds
             rendered_config[name]["workload_configs"] = workload_configs
             suite.pop("case")
 
         suite.pop("exec_cmd")
     return rendered_config
+
+
+def _setup_env():
+    """Get workload env dict"""
+    os.environ["RAY_WHEEL"] = wheel_url(
+        global_context["ray_version"],
+        global_context["git_branch"],
+        global_context["git_commit"])
+    os.environ["RAY_VERSION"] = global_context["ray_version"]
 
 
 @contextmanager
@@ -107,8 +119,14 @@ def cd(path):
     os.chdir(saved_path)
 
 
+def wheel_url(ray_version, git_branch, git_commit):
+    return f"https://s3-us-west-2.amazonaws.com/ray-wheels/" \
+           f"{git_branch}/{git_commit}/" \
+           f"ray-{ray_version}-cp37-cp37m-manylinux2014_x86_64.whl"
+
+
 def wheel_exists(ray_version, git_branch, git_commit):
-    url = f"https://s3-us-west-2.amazonaws.com/ray-wheels/{git_branch}/{git_commit}/ray-{ray_version}-cp36-cp36m-manylinux2014_x86_64.whl"
+    url = wheel_url(ray_version, git_branch, git_commit)
     return requests.head(url).status_code == 200
 
 
@@ -125,6 +143,8 @@ def ensure_repo(
 ):
     color_print("Running precondition check...")
 
+    # This ray clone is used to find recent commits
+    # We thus don't use LOCAL_RAY_DIR here
     if not os.path.exists("ray"):
         color_print("💾 Ray repository not found. Cloning...")
         run_shell(f"git clone https://github.com/{git_org}/ray.git")
@@ -173,7 +193,7 @@ def ensure_repo(
 def validate_tests():
     """Validate the test suites from `config.toml`"""
     config = _get_config()
-    with cd("ray"):
+    with cd(LOCAL_RAY_DIR):
         for name, entry in config.items():
             cluster_file = os.path.join(entry["base_dir"], entry["cluster_config"])
 
@@ -209,7 +229,7 @@ def _create_or_get_project_id(project_name: str):
 
 def run_case(base_dir, execution_steps):
     print(f"Thread {threading.get_ident()} running {execution_steps}")
-    with cd(os.path.join("ray", base_dir)):
+    with cd(os.path.join(LOCAL_RAY_DIR, base_dir)):
         for step in execution_steps:
             run_shell_stream(step)
 
@@ -234,6 +254,8 @@ def run_test(
     cluster_config = suite_config["cluster_config"]
 
     project_id = _create_or_get_project_id(project_name=f"{PREFIX}-{name}")
+
+    _setup_env()
 
     workload_exec_steps = {}
     cleanup_steps = []
@@ -291,7 +313,7 @@ def run_test(
 
     color_print(f"🚀 Kicking off")
     for command in global_execution_steps:
-        with cd(os.path.join("ray", base_dir)):
+        with cd(os.path.join(LOCAL_RAY_DIR, base_dir)):
             run_shell_stream(command)
     try:
         with ProcessPoolExecutor(max_workers=len(workload_exec_steps)) as executor:

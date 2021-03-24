@@ -75,12 +75,7 @@ bash run.sh --ray-version={{ctx["ray_version"]}} \
 [long_running_distributed]
 base_dir = "release/long_running_distributed_tests"
 cluster_config = "cluster.yaml"
-exec_cmd = """
-bash run.sh --ray-version={{ctx["ray_version"]}} \
-            --commit={{ctx["git_commit"]}} \
-            --ray-branch={{ctx["git_branch"]}} \
-            --workload={{ctx["workload"]}}
-"""
+exec_cmd = "python workloads/{{ctx['workload']}}.py"
 
     [[long_running_distributed.case]]
     workload = "pytorch_pbt_failure"
