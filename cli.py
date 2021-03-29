@@ -1,3 +1,4 @@
+import datetime
 import os
 import subprocess
 import threading
@@ -107,6 +108,11 @@ def _setup_env():
         global_context["git_branch"],
         global_context["git_commit"])
     os.environ["RAY_VERSION"] = global_context["ray_version"]
+
+    os.environ["ANYSCALE_USER"] = os.environ.get(
+        "ANYSCALE_USER", "eng@anyscale.com")
+    expiry = datetime.datetime.now() + datetime.timedelta(days=1)
+    os.environ["ANYSCALE_EXPIRATION"] = expiry.strftime("%Y-%m-%d")
 
 
 @contextmanager
@@ -285,7 +291,7 @@ def run_test(
         # Might want to swap this to run on every node (at least for the command to install ray.)
         exec_options += " --stop" if stop else " "
         local_exec_steps.append(
-            f"anyscale exec {exec_options} --session-name {session_name} -- {workload_cmd}"
+            f"anyscale exec {exec_options} --session-name {session_name} -- '{workload_cmd}'"
         )
         workload_exec_steps[workload_name] = local_exec_steps
 

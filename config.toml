@@ -135,13 +135,7 @@ python scalability.py
 [tune_scalability_tests]
 base_dir = "release/tune_tests/scalability_tests"
 cluster_config = "cluster_1x16.yaml"
-exec_cmd = """
-bash run.sh --nodes={{ctx["nodes"]}} \
-            --ray-version={{ctx["ray_version"]}} \
-            --commit={{ctx["git_commit"]}} \
-            --ray-branch={{ctx["git_branch"]}} \
-            --workload={{ctx["workload"]}}
-"""
+exec_cmd = """python wait_cluster.py {{ctx["nodes"]}} 600 && python workloads/{{ctx["workload"]}}.py"""
 
     [[tune_scalability_tests.case]]
     cluster_config = "cluster_1x16.yaml"
@@ -215,13 +209,7 @@ bash run.sh --ray-version={{ctx["ray_version"]}} \
 [xgboost_tests]
 base_dir = "release/xgboost_tests"
 cluster_config = "cluster_cpu_small.yaml"
-exec_cmd = """
-bash run.sh --nodes={{ctx["nodes"]}} \
-            --ray-version={{ctx["ray_version"]}} \
-            --commit={{ctx["git_commit"]}} \
-            --ray-branch={{ctx["git_branch"]}} \
-            --workload={{ctx["workload"]}}
-"""
+exec_cmd = """python wait_cluster.py {{ctx["nodes"]}} 600 && python workloads/{{ctx["workload"]}}.py"""
 
     [[xgboost_tests.case]]
     cluster_config = "cluster_cpu_small.yaml"
