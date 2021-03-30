@@ -269,10 +269,14 @@ def run_test(
         if workload and workload_name != workload:
             continue
 
-        workload_config = suite_config["workload_configs"][workload_name]
-
-        workload_cluster_config = workload_config.get(
-            "cluster_config", cluster_config)
+        if "workload_config" in suite_config:
+            # Support each workloading having its own cluster config.
+            workload_config = suite_config["workload_configs"][workload_name]
+            workload_cluster_config = workload_config.get(
+                "cluster_config", cluster_config)
+        else:
+            # Simple tests with only 1 workload (microbenchmarks) use the cluster_config.
+            workload_cluster_config = cluster_config
 
         # session_name format: gitsha-timestamp
         session_name = (
