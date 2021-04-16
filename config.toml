@@ -15,12 +15,7 @@
 [microbenchmark]
 base_dir = "release/microbenchmark"
 cluster_config = "cluster.yaml"
-exec_cmd = """
-bash run.sh --ray-version={{ctx["ray_version"]}} \
-            --commit={{ctx["git_commit"]}} \
-            --ray-branch={{ctx["git_branch"]}}
-"""
-
+exec_cmd = "OMP_NUM_THREADS=64 ray microbenchmark"
 
 # ---------------------------------------------------
 # Release tests.
@@ -35,8 +30,8 @@ bash run.sh --ray-version={{ctx["ray_version"]}} \
             --workload={{ctx["workload"]}}
 """
 
-    [[long_running_tests.case]]
-    workload = "serve"
+    # [[long_running_tests.case]]
+    # workload = "serve"
 
     [[long_running_tests.case]]
     workload = "serve_failure"
@@ -80,7 +75,12 @@ exec_cmd = "python workloads/{{ctx['workload']}}.py"
     [[long_running_distributed.case]]
     workload = "pytorch_pbt_failure"
 
-    [[long_running_distributed.case]]
+[horovod]
+base_dir = "release/horovod_test"
+cluster_config = "cluster.yaml"
+exec_cmd = "python ../util/wait_cluster.py 3 600 && python workloads/{{ctx['workload']}}.py"
+
+    [[horovod.case]]
     workload = "horovod_test"
 
 # ---------------------------------------------------
