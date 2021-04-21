@@ -15,7 +15,8 @@
 [microbenchmark]
 base_dir = "release/microbenchmark"
 cluster_config = "cluster.yaml"
-exec_cmd = "OMP_NUM_THREADS=64 ray microbenchmark"
+exec_cmd = """unset RAY_ADDRESS && OMP_NUM_THREADS=64 ray microbenchmark"""
+
 
 # ---------------------------------------------------
 # Release tests.
@@ -30,8 +31,8 @@ bash run.sh --ray-version={{ctx["ray_version"]}} \
             --workload={{ctx["workload"]}}
 """
 
-    # [[long_running_tests.case]]
-    # workload = "serve"
+    [[long_running_tests.case]]
+    workload = "serve"
 
     [[long_running_tests.case]]
     workload = "serve_failure"
@@ -44,9 +45,11 @@ bash run.sh --ray-version={{ctx["ray_version"]}} \
 
     [[long_running_tests.case]]
     workload = "apex"
+    cluster_config = "larger.yaml"
 
     [[long_running_tests.case]]
     workload = "impala"
+    cluster_config = "larger.yaml"
 
     [[long_running_tests.case]]
     workload = "many_actor_tasks"
@@ -55,6 +58,7 @@ bash run.sh --ray-version={{ctx["ray_version"]}} \
     workload = "many_drivers"
 
     [[long_running_tests.case]]
+    cluster_config = "threenode.yaml"
     workload = "many_ppo"
 
     [[long_running_tests.case]]
@@ -104,6 +108,14 @@ bash run.sh --ray-version={{ctx["ray_version"]}} \
 
     # [[stress_tests.case]]
     # workload = "test_placement_group"
+
+# ---------------------------------------------------
+# ASAN tests.
+# ---------------------------------------------------
+[asan_tests]
+base_dir = "release/asan_tests"
+cluster_config = "cluster.yaml"
+exec_cmd = """bash run_asan_tests.sh {{ctx["git_branch"]}} {{ctx["git_commit"]}}"""
 
 
 # ---------------------------------------------------
@@ -179,29 +191,26 @@ exec_cmd = """python ../../util/wait_cluster.py {{ctx["nodes"]}} 600 && python w
 [rllib_regression_tests]
 base_dir = "release/rllib_tests/regression_tests"
 cluster_config = "cluster.yaml"
-exec_cmd = """
-bash run.sh --ray-version={{ctx["ray_version"]}} \
-            --commit={{ctx["git_commit"]}} \
-            --ray-branch={{ctx["git_branch"]}}
-"""
+exec_cmd = """bash {{ctx["workload"]}}.sh"""
+
+    [[rllib_regression_tests.case]]
+    workload = "run_tf"
+
+    [[rllib_regression_tests.case]]
+    workload = "run_torch"
+
 
 [rllib_stress_tests]
 base_dir = "release/rllib_tests/stress_tests"
 cluster_config = "cluster.yaml"
-exec_cmd = """
-bash run.sh --ray-version={{ctx["ray_version"]}} \
-            --commit={{ctx["git_commit"]}} \
-            --ray-branch={{ctx["git_branch"]}}
-"""
+exec_cmd = """bash run.sh"""
+
 
 [rllib_unit_gpu_tests]
 base_dir = "release/rllib_tests/unit_gpu_tests"
 cluster_config = "cluster.yaml"
-exec_cmd = """
-bash run.sh --ray-version={{ctx["ray_version"]}} \
-            --commit={{ctx["git_commit"]}} \
-            --ray-branch={{ctx["git_branch"]}}
-"""
+exec_cmd = """bash run.sh {{ctx["git_commit"]}}"""
+
 
 # ---------------------------------------------------
 # XGBoost tests.

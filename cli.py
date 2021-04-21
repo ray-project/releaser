@@ -269,7 +269,7 @@ def run_test(
         if workload and workload_name != workload:
             continue
 
-        if "workload_config" in suite_config:
+        if "workload_configs" in suite_config:
             # Support each workloading having its own cluster config.
             workload_config = suite_config["workload_configs"][workload_name]
             workload_cluster_config = workload_config.get(
@@ -330,7 +330,7 @@ def run_test(
             for workload_cmds in workload_exec_steps.values():
                 executor.submit(run_case, base_dir, workload_cmds)
     finally:
-        with cd(os.path.join("ray", base_dir)):
+        with cd(os.path.join(LOCAL_RAY_DIR, base_dir)):
             for command in cleanup_steps:
                 try:
                     run_shell_stream(command)
