@@ -218,7 +218,7 @@ exec_cmd = """bash run.sh {{ctx["git_commit"]}}"""
 [xgboost_tests]
 base_dir = "release/xgboost_tests"
 cluster_config = "cluster_cpu_small.yaml"
-exec_cmd = """python ../util/wait_cluster.py {{ctx["nodes"]}} 600 && python workloads/{{ctx["workload"]}}.py"""
+exec_cmd = """python wait_cluster.py {{ctx["nodes"]}} 600 && python workloads/{{ctx["workload"]}}.py"""
 
     [[xgboost_tests.case]]
     cluster_config = "cluster_cpu_small.yaml"
