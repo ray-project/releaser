@@ -1,0 +1,5 @@
+steps:
+  - plugins:
+    - docker#v3.7.0:
+        image: amazon/aws-cli
+    command: "--version"
