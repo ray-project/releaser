@@ -4,5 +4,6 @@ steps:
              --secret-arn "arn:aws:secretsmanager:us-west-2:029272617770:secret:rds-db-credentials/cluster-ray-ci20210429214152254800000001-ijtmvd"
              --database "ray_ci"
              --sql "select * from information_schema.tables;"
+             --region us-west-2
     agents:
       queue: runner_queue_branch
