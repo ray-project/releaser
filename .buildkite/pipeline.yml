@@ -1,9 +1,9 @@
 steps:
   - command: docker run -it --rm amazon/aws-cli
-             "rds-data execute-statement
+             'rds-data execute-statement
              --resource-arn "arn:aws:rds:us-west-2:029272617770:cluster:ci-reporting"
              --secret-arn "arn:aws:secretsmanager:us-west-2:029272617770:secret:rds-db-credentials/cluster-ray-ci20210429214152254800000001-ijtmvd"
              --database "ray_ci"
-             --sql "select * from information_schema.tables;" | jq"
+             --sql "select * from information_schema.tables;" | jq'
     agents:
       queue: runner_queue_branch
