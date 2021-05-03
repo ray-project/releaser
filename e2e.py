@@ -1,8 +1,7 @@
 import argparse
-import datetime
-
 import boto3
 import collections
+import datetime
 import hashlib
 import jinja2
 import json
@@ -39,7 +38,7 @@ GLOBAL_CONFIG = {
     "ANYSCALE_CLI_TOKEN": os.environ["ANYSCALE_CLI_TOKEN"],
     "ANYSCALE_CLOUD_ID": os.environ.get("ANYSCALE_CLOUD_ID", "cld_4F7k8814aZzGG8TNUGPKnc"),  # cld_4F7k8814aZzGG8TNUGPKnc
     "ANYSCALE_PROJECT": os.environ.get("ANYSCALE_PROJECT", "prj_3dcxfLlSDL6HTav8k4NbTb"),  # kf-dev
-    "RELEASE_AWS_BUCKET": os.environ.get("RELEASE_AWS_BUCKET", "release-pipeline-result"),
+    "RELEASE_AWS_BUCKET": os.environ.get("RELEASE_AWS_BUCKET", "ray-release-test-results"),
     "RELEASE_AWS_LOCATION": os.environ.get("RELEASE_AWS_LOCATION", "dev"),
     "RELEASE_AWS_DB_NAME": os.environ.get("RELEASE_AWS_DB_NAME", "ray_ci"),
     "RELEASE_AWS_DB_TABLE": os.environ.get("RELEASE_AWS_DB_TABLE", "release_test_result"),
@@ -48,6 +47,14 @@ GLOBAL_CONFIG = {
 }
 
 REPORT_S = 30
+
+
+class State:
+    def __init__(self, state: str, timestamp: float, data: Any):
+        self.state = state
+        self.timestamp = timestamp
+        self.data = data
+
 
 sys.path.insert(0, anyscale.ANYSCALE_RAY_DIR)
 
@@ -526,6 +533,7 @@ def run_test_config(
 
             logger.info(f"Running command in session {session_name}: \n"
                          f"{cmd_to_run}")
+            result_queue.put(State("CMD_RUN", time.time(), None))
             result = sdk.create_session_command(dict(
                 session_id=session_id,
                 shell_command=cmd_to_run
@@ -577,12 +585,12 @@ def run_test_config(
 
             logger.info("Fetched results and stored on the cloud. Returning.")
 
-            result_queue.put({
+            result_queue.put(State("END", time.time(), {
                 "status": "finished",
                 "last_logs": logs,
                 "results": results,
                 "artifacts": saved_artifacts
-            })
+            }))
 
         except Exception as e:
             logger.error(e, exc_info=True)
@@ -597,7 +605,8 @@ def run_test_config(
                 except Exception as e2:
                     logger.error(e2, exc_info=True)
 
-            result_queue.put({"status": "error", "last_logs": logs})
+            result_queue.put(State(
+                "END", time.time(), {"status": "error", "last_logs": logs}))
         finally:
             _cleanup_session(sdk, session_id)
             shutil.rmtree(temp_dir)
@@ -605,13 +614,33 @@ def run_test_config(
     timeout = test_config["run"].get("timeout", 1800)
 
     process = multiprocessing.Process(target=_run, args=(logger,))
-    start_time = time.time()
 
     logger.info(f"Starting process with timeout {timeout}")
     process.start()
 
+    # This is a timeout for the full run
+    # Should we add a specific build timeout here?
+    timeout_time = time.time() + timeout
+
+    result = {}
     while process.is_alive():
-        if time.time() > start_time + timeout:
+        try:
+            state: State = result_queue.get(timeout=1)
+        except (Empty, TimeoutError):
+            continue
+
+        if not isinstance(state, State):
+            raise RuntimeError(f"Expected `State` object, got {result}")
+
+        if state.state == "CMD_RUN":
+            # Reset timeout after build finished
+            timeout_time = state.timestamp + timeout
+
+        elif state.state == "END":
+            result = state.data
+            break
+
+        if time.time() > timeout_time:
             stop_event.set()
             logger.warning("Process timed out")
             time.sleep(2)
@@ -619,10 +648,13 @@ def run_test_config(
             logger.warning("Terminating process")
             break
 
+    while not result_queue.empty():
+        state = result_queue.get_nowait()
+        result = state.data
+
     logger.info("Final check if everything worked.")
     try:
-        result: Dict[Any, Any] = result_queue.get(timeout=2)
-        result.setdefault("status", "finished")
+        result.setdefault("status", "error")
     except (TimeoutError, Empty):
         result = {"status": "timeout", "last_logs": "Test timed out."}
 
