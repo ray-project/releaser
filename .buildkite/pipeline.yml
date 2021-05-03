@@ -1,0 +1,19 @@
+steps:
+  - label: Clone Ray repo
+    command: git clone https://github.com/ray-project/ray.git ~/ray
+  - label: Run xgboost tune_small test
+    command: python e2e.py --test-config ~/ray/release/xgboost_tests/xgboost_tests.yaml --test-name tune_small
+
+    env:
+      - ANYSCALE_HOST: https://beta.anyscale.com
+      - ANYSCALE_CLI_TOKEN:
+      - ANYSCALE_CLOUD_ID: cld_4F7k8814aZzGG8TNUGPKnc
+      - ANYSCALE_PROJECT: prj_3dcxfLlSDL6HTav8k4NbTb
+      - RELEASE_AWS_BUCKET: ray-release-test-results
+      - RELEASE_AWS_LOCATION: dev
+      - RELEASE_AWS_DB_NAME: ray_ci
+      - RELEASE_AWS_DB_TABLE: release_test_result
+      - RELEASE_AWS_DB_SECRET_ARN: arn:aws:secretsmanager:us-west-2:029272617770:secret:rds-db-credentials/cluster-ray-ci20210429214152254800000001-ijtmvd
+      - RELEASE_AWS_DB_RESOURCE_ARN: arn:aws:rds:us-west-2:029272617770:cluster:ci-reporting
+    agents:
+      queue: runner_queue_branch
