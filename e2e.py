@@ -43,7 +43,7 @@ GLOBAL_CONFIG = {
         "ANYSCALE_PROJECT", "prj_3dcxfLlSDL6HTav8k4NbTb"
     ),  # kf-dev
     "RELEASE_AWS_BUCKET": os.environ.get(
-        "RELEASE_AWS_BUCKET", "ray-release-test-results"
+        "RELEASE_AWS_BUCKET", "ray-release-automation-results"
     ),
     "RELEASE_AWS_LOCATION": os.environ.get("RELEASE_AWS_LOCATION", "dev"),
     "RELEASE_AWS_DB_NAME": os.environ.get("RELEASE_AWS_DB_NAME", "ray_ci"),
