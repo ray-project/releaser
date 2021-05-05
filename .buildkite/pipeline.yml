@@ -16,5 +16,5 @@ steps:
       queue: runner_queue_branch
     plugins:
       - docker#v3.8.0:
-          image: "python:3.7"
+          image: "anyscale/ray"
           propagate-environment: true

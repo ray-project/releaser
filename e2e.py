@@ -130,7 +130,7 @@ def report_result(
     artifacts: Dict[Any, Any],
 ):
     now = datetime.datetime.utcnow()
-    rds_data_client = boto3.client("rds-data")
+    rds_data_client = boto3.client("rds-data", region_name="us-west-2")
 
     schema = GLOBAL_CONFIG["RELEASE_AWS_DB_TABLE"]
 
