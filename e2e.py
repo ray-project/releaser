@@ -66,7 +66,7 @@ if GLOBAL_CONFIG["ANYSCALE_CLI_TOKEN"] is None:
     print("Missing ANYSCALE_CLI_TOKEN, retrieving from AWS secrets store")
     # NOTE(simon) This should automatically retrieve release-automation@anyscale.com's anyscale token
     GLOBAL_CONFIG["ANYSCALE_CLI_TOKEN"] = boto3.client(
-        "secretsmanager"
+        "secretsmanager", region_name="us-west-2"
     ).get_secret_value(
         SecretId="arn:aws:secretsmanager:us-west-2:029272617770:secret:release-automation/anyscale-token20210505220406333800000001-BcUuKB"
     )[
