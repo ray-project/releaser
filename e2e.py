@@ -26,27 +26,52 @@ from anyscale.sdk.anyscale_client.sdk import AnyscaleSDK
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
 handler = logging.StreamHandler(stream=sys.stdout)
-formatter = logging.Formatter(fmt="[%(levelname)s %(asctime)s] "
-                                  "%(filename)s: %(lineno)d  "
-                                  "%(message)s")
+formatter = logging.Formatter(
+    fmt="[%(levelname)s %(asctime)s] " "%(filename)s: %(lineno)d  " "%(message)s"
+)
 handler.setFormatter(formatter)
 logger.addHandler(handler)
 
 
 GLOBAL_CONFIG = {
     "ANYSCALE_HOST": os.environ.get("ANYSCALE_HOST", "https://beta.anyscale.com"),
-    "ANYSCALE_CLI_TOKEN": os.environ["ANYSCALE_CLI_TOKEN"],
-    "ANYSCALE_CLOUD_ID": os.environ.get("ANYSCALE_CLOUD_ID", "cld_4F7k8814aZzGG8TNUGPKnc"),  # cld_4F7k8814aZzGG8TNUGPKnc
-    "ANYSCALE_PROJECT": os.environ.get("ANYSCALE_PROJECT", "prj_3dcxfLlSDL6HTav8k4NbTb"),  # kf-dev
-    "RELEASE_AWS_BUCKET": os.environ.get("RELEASE_AWS_BUCKET", "ray-release-test-results"),
+    "ANYSCALE_CLI_TOKEN": os.environ.get("ANYSCALE_CLI_TOKEN"),
+    "ANYSCALE_CLOUD_ID": os.environ.get(
+        "ANYSCALE_CLOUD_ID", "cld_4F7k8814aZzGG8TNUGPKnc"
+    ),  # cld_4F7k8814aZzGG8TNUGPKnc
+    "ANYSCALE_PROJECT": os.environ.get(
+        "ANYSCALE_PROJECT", "prj_3dcxfLlSDL6HTav8k4NbTb"
+    ),  # kf-dev
+    "RELEASE_AWS_BUCKET": os.environ.get(
+        "RELEASE_AWS_BUCKET", "ray-release-test-results"
+    ),
     "RELEASE_AWS_LOCATION": os.environ.get("RELEASE_AWS_LOCATION", "dev"),
     "RELEASE_AWS_DB_NAME": os.environ.get("RELEASE_AWS_DB_NAME", "ray_ci"),
-    "RELEASE_AWS_DB_TABLE": os.environ.get("RELEASE_AWS_DB_TABLE", "release_test_result"),
-    "RELEASE_AWS_DB_SECRET_ARN": os.environ["RELEASE_AWS_DB_SECRET_ARN"],
-    "RELEASE_AWS_DB_RESOURCE_ARN": os.environ.get("RELEASE_AWS_DB_RESOURCE_ARN", "arn:aws:rds:us-west-2:029272617770:cluster:ci-reporting"),
+    "RELEASE_AWS_DB_TABLE": os.environ.get(
+        "RELEASE_AWS_DB_TABLE", "release_test_result"
+    ),
+    "RELEASE_AWS_DB_SECRET_ARN": os.environ.get(
+        "RELEASE_AWS_DB_SECRET_ARN",
+        "arn:aws:secretsmanager:us-west-2:029272617770:secret:rds-db-credentials/cluster-7RB7EYTTBK2EUC3MMTONYRBJLE/ray_ci-MQN2hh",
+    ),
+    "RELEASE_AWS_DB_RESOURCE_ARN": os.environ.get(
+        "RELEASE_AWS_DB_RESOURCE_ARN",
+        "arn:aws:rds:us-west-2:029272617770:cluster:ci-reporting",
+    ),
 }
 
 REPORT_S = 30
+
+if GLOBAL_CONFIG["ANYSCALE_CLI_TOKEN"] is None:
+    print("Missing ANYSCALE_CLI_TOKEN, retrieving from AWS secrets store")
+    # NOTE(simon) This should automatically retrieve release-automation@anyscale.com's anyscale token
+    GLOBAL_CONFIG["ANYSCALE_CLI_TOKEN"] = boto3.client(
+        "secretsmanager"
+    ).get_secret_value(
+        SecretId="arn:aws:secretsmanager:us-west-2:029272617770:secret:release-automation/anyscale-token20210505220406333800000001-BcUuKB"
+    )[
+        "SecretString"
+    ]
 
 
 class State:
@@ -89,9 +114,7 @@ def _load_config(local_dir: str, config_file: Optional[str]) -> Optional[Dict]:
         # Todo: jinja2 render
         content = f.read()
 
-    content = jinja2.Template(content).render(
-        env=GLOBAL_CONFIG
-    )
+    content = jinja2.Template(content).render(env=GLOBAL_CONFIG)
     return yaml.safe_load(content)
 
 
@@ -100,20 +123,22 @@ def should_report_error(result: Dict[Any, Any]) -> bool:
 
 
 def report_result(
-        test_name: str,
-        status: str,
-        logs: str,
-        results: Dict[Any, Any],
-        artifacts: Dict[Any, Any]
+    test_name: str,
+    status: str,
+    logs: str,
+    results: Dict[Any, Any],
+    artifacts: Dict[Any, Any],
 ):
     now = datetime.datetime.utcnow()
     rds_data_client = boto3.client("rds-data")
 
     schema = GLOBAL_CONFIG["RELEASE_AWS_DB_TABLE"]
 
-    sql = f"INSERT INTO {schema} " \
-          f"(created_on, test_name, status, last_logs, results, artifacts) " \
-          f"VALUES (:created_on, :test_name, :status, :last_logs, :results, :artifacts)"
+    sql = (
+        f"INSERT INTO {schema} "
+        f"(created_on, test_name, status, last_logs, results, artifacts) "
+        f"VALUES (:created_on, :test_name, :status, :last_logs, :results, :artifacts)"
+    )
 
     rds_data_client.execute_statement(
         database=GLOBAL_CONFIG["RELEASE_AWS_DB_NAME"],
@@ -121,53 +146,31 @@ def report_result(
             {
                 "name": "created_on",
                 "typeHint": "TIMESTAMP",
-                "value": {
-                    "stringValue": now.strftime("%Y-%m-%d %H:%M:%S")
-                }
+                "value": {"stringValue": now.strftime("%Y-%m-%d %H:%M:%S")},
             },
-            {
-                "name": "test_name",
-                "value": {
-                    "stringValue": test_name
-                }
-            },
-            {
-                "name": "status",
-                "value": {
-                    "stringValue": status
-                }
-            },
-            {
-                "name": "last_logs",
-                "value": {
-                    "stringValue": logs
-                }
-            },
+            {"name": "test_name", "value": {"stringValue": test_name}},
+            {"name": "status", "value": {"stringValue": status}},
+            {"name": "last_logs", "value": {"stringValue": logs}},
             {
                 "name": "results",
                 "typeHint": "JSON",
-                "value": {
-                    "stringValue": json.dumps(results)
-                }
+                "value": {"stringValue": json.dumps(results)},
             },
             {
                 "name": "artifacts",
                 "typeHint": "JSON",
-                "value": {
-                    "stringValue": json.dumps(artifacts)
-                }
-            }
+                "value": {"stringValue": json.dumps(artifacts)},
+            },
         ],
         secretArn=GLOBAL_CONFIG["RELEASE_AWS_DB_SECRET_ARN"],
         resourceArn=GLOBAL_CONFIG["RELEASE_AWS_DB_RESOURCE_ARN"],
         schema=schema,
-        sql=sql
+        sql=sql,
     )
 
 
 def notify(owner: Dict[Any, Any], result: Dict[Any, Any]):
-    logger.error(f"I would now inform {owner['slack']} about this result: "
-                 f"{result}")
+    logger.error(f"I would now inform {owner['slack']} about this result: " f"{result}")
     # Todo: Send to slack?
 
 
@@ -177,29 +180,26 @@ def _cleanup_session(sdk: AnyscaleSDK, session_id: str):
         sdk.stop_session(session_id=session_id, stop_session_options={})
 
 
-def search_running_session(sdk: AnyscaleSDK, project_id: str, session_name: str) -> Optional[str]:
+def search_running_session(
+    sdk: AnyscaleSDK, project_id: str, session_name: str
+) -> Optional[str]:
     session_id = None
 
-    logger.info(
-        f"Looking for existing session with name {session_name}")
+    logger.info(f"Looking for existing session with name {session_name}")
 
     result = sdk.search_sessions(
-        project_id=project_id,
-        sessions_query=dict(
-            name=dict(
-                equals=session_name
-            )
-        )
+        project_id=project_id, sessions_query=dict(name=dict(equals=session_name))
     )
 
-    if len(result.results) > 0 and \
-            result.results[0].state == "Running":
+    if len(result.results) > 0 and result.results[0].state == "Running":
         logger.info("Found existing session.")
         session_id = result.results[0].id
     return session_id
 
 
-def create_or_find_compute_template(sdk: AnyscaleSDK, project_id: str, compute_tpl: Dict[Any, Any]) -> Optional[str]:
+def create_or_find_compute_template(
+    sdk: AnyscaleSDK, project_id: str, compute_tpl: Dict[Any, Any]
+) -> Optional[str]:
     compute_tpl_id = None
     if compute_tpl:
         compute_tpl_hash = _dict_hash(compute_tpl)
@@ -207,31 +207,29 @@ def create_or_find_compute_template(sdk: AnyscaleSDK, project_id: str, compute_t
         logger.info(
             f"Tests uses compute template "
             f"with hash {compute_tpl_hash}. Looking up existing "
-            f"templates.")
+            f"templates."
+        )
 
-        result = sdk.search_compute_templates(dict(
-            project_id=project_id
-        ))
+        result = sdk.search_compute_templates(dict(project_id=project_id))
         for res in result.results:
             if res.name == compute_tpl_hash:
                 compute_tpl_id = res.id
-                logger.info(
-                    f"Template already exists with ID {compute_tpl_id}")
+                logger.info(f"Template already exists with ID {compute_tpl_id}")
                 break
 
         if not compute_tpl_id:
-            result = sdk.create_compute_template(dict(
-                name=compute_tpl_hash,
-                project_id=project_id,
-                config=compute_tpl
-            ))
+            result = sdk.create_compute_template(
+                dict(name=compute_tpl_hash, project_id=project_id, config=compute_tpl)
+            )
             compute_tpl_id = result.result.id
             logger.info(f"Template created with ID {compute_tpl_id}")
 
     return compute_tpl_id
 
 
-def create_or_find_app_config(sdk: AnyscaleSDK, project_id: str, app_config: Dict[Any, Any]) -> Optional[str]:
+def create_or_find_app_config(
+    sdk: AnyscaleSDK, project_id: str, app_config: Dict[Any, Any]
+) -> Optional[str]:
     app_config_id = None
     if app_config:
         app_config_hash = _dict_hash(app_config)
@@ -239,29 +237,31 @@ def create_or_find_app_config(sdk: AnyscaleSDK, project_id: str, app_config: Dic
         logger.info(
             f"Tests uses app config "
             f"with hash {app_config_hash}. Looking up existing "
-            f"app configs.")
+            f"app configs."
+        )
 
         result = sdk.list_app_configs(project_id=project_id)
         for res in result.results:
             if res.name == app_config_hash:
                 app_config_id = res.id
-                logger.info(
-                    f"App config already exists with ID {app_config_id}")
+                logger.info(f"App config already exists with ID {app_config_id}")
                 break
 
         if not app_config_id:
-            result = sdk.create_app_config(dict(
-                name=app_config_hash,
-                project_id=project_id,
-                config_json=app_config
-            ))
+            result = sdk.create_app_config(
+                dict(
+                    name=app_config_hash, project_id=project_id, config_json=app_config
+                )
+            )
             app_config_id = result.result.id
             logger.info(f"App config created with ID {app_config_id}")
 
     return app_config_id
 
 
-def wait_for_build_or_raise(sdk: AnyscaleSDK, app_config_id: Optional[str]) -> Optional[str]:
+def wait_for_build_or_raise(
+    sdk: AnyscaleSDK, app_config_id: Optional[str]
+) -> Optional[str]:
     if not app_config_id:
         return None
 
@@ -290,7 +290,8 @@ def wait_for_build_or_raise(sdk: AnyscaleSDK, app_config_id: Optional[str]) -> O
         if now > next_report:
             logger.info(
                 f"... still waiting for build {build_id} to finish "
-                f"({int(now - start_wait)} seconds) ...")
+                f"({int(now - start_wait)} seconds) ..."
+            )
             next_report = next_report + REPORT_S
 
         result = sdk.get_build(build_id)
@@ -313,10 +314,11 @@ def wait_for_build_or_raise(sdk: AnyscaleSDK, app_config_id: Optional[str]) -> O
 
 
 def create_and_wait_for_session(
-        sdk: AnyscaleSDK,
-        stop_event: multiprocessing.Event,
-        session_name: str,
-        session_options: Dict[Any, Any]) -> str:
+    sdk: AnyscaleSDK,
+    stop_event: multiprocessing.Event,
+    session_name: str,
+    session_options: Dict[Any, Any],
+) -> str:
 
     # Create session
     logger.info(f"Creating session {session_name}")
@@ -325,8 +327,7 @@ def create_and_wait_for_session(
 
     # Trigger session start
     logger.info(f"Starting session {session_name} ({session_id})")
-    result = sdk.start_session(
-        session_id, start_session_options={})
+    result = sdk.start_session(session_id, start_session_options={})
     sop_id = result.result.id
     completed = result.result.completed
 
@@ -340,7 +341,8 @@ def create_and_wait_for_session(
         if now > next_report:
             logger.info(
                 f"... still waiting for session {session_name} "
-                f"({int(now - start_wait)} seconds) ...")
+                f"({int(now - start_wait)} seconds) ..."
+            )
             next_report = next_report + REPORT_S
 
         session_operation_response = sdk.get_session_operation(
@@ -353,83 +355,75 @@ def create_and_wait_for_session(
     return session_id
 
 
-def get_command_logs(session_controller: SessionController, scd_id: str, lines: int = 50):
+def get_command_logs(
+    session_controller: SessionController, scd_id: str, lines: int = 50
+):
     result = session_controller.api_client.get_execution_logs_api_v2_session_commands_session_command_id_execution_logs_get(
-        session_command_id=scd_id,
-        start_line=-1 * lines,
-        end_line=0
+        session_command_id=scd_id, start_line=-1 * lines, end_line=0
     )
 
     return result.result.lines
 
 
 def get_remote_json_content(
-        temp_dir: str,
-        session_name: str,
-        remote_file: Optional[str],
-        session_controller: SessionController,
+    temp_dir: str,
+    session_name: str,
+    remote_file: Optional[str],
+    session_controller: SessionController,
 ):
     if not remote_file:
         logger.warning("No remote file specified, returning empty dict")
         return {}
     local_target_file = os.path.join(temp_dir, ".tmp.json")
     session_controller.pull(
-        session_name=session_name,
-        source=remote_file,
-        target=local_target_file
+        session_name=session_name, source=remote_file, target=local_target_file
     )
     with open(local_target_file, "rt") as f:
         return json.load(f)
 
 
 def pull_artifacts_and_store_in_cloud(
-        temp_dir: str,
-        logs: str,
-        session_name: str,
-        test_name: str,
-        artifacts: Optional[Dict[Any, Any]],
-        session_controller: SessionController,
+    temp_dir: str,
+    logs: str,
+    session_name: str,
+    test_name: str,
+    artifacts: Optional[Dict[Any, Any]],
+    session_controller: SessionController,
 ):
     output_log_file = os.path.join(temp_dir, "output.log")
     with open(output_log_file, "wt") as f:
         f.write(logs)
 
     bucket = GLOBAL_CONFIG["RELEASE_AWS_BUCKET"]
-    location = f"{GLOBAL_CONFIG['RELEASE_AWS_LOCATION']}" \
-               f"/{session_name}/{test_name}"
+    location = f"{GLOBAL_CONFIG['RELEASE_AWS_LOCATION']}" f"/{session_name}/{test_name}"
     saved_artifacts = {}
 
     s3_client = boto3.client("s3")
-    s3_client.upload_file(
-        output_log_file, bucket, f"{location}/output.log")
+    s3_client.upload_file(output_log_file, bucket, f"{location}/output.log")
     saved_artifacts["output.log"] = f"s3://{bucket}/{location}/output.log"
 
     # Download artifacts
     if artifacts:
         for name, remote_file in artifacts.items():
-            logger.info(f"Downloading artifact `{name}` from "
-                        f"{remote_file}")
+            logger.info(f"Downloading artifact `{name}` from " f"{remote_file}")
             local_target_file = os.path.join(temp_dir, name)
             session_controller.pull(
-                session_name=session_name,
-                source=remote_file,
-                target=local_target_file
+                session_name=session_name, source=remote_file, target=local_target_file
             )
 
             # Upload artifacts to s3
-            s3_client.upload_file(
-                local_target_file, bucket, f"{location}/{name}")
+            s3_client.upload_file(local_target_file, bucket, f"{location}/{name}")
             saved_artifacts[name] = f"s3://{bucket}/{location}/{name}"
 
     return saved_artifacts
 
 
 def run_test_config(
-        local_dir: str,
-        project_id: str,
-        test_name: str,
-        test_config: Dict[Any, Any],
-        smoke_test: bool = False,
+    local_dir: str,
+    project_id: str,
+    test_name: str,
+    test_config: Dict[Any, Any],
+    smoke_test: bool = False,
 ) -> Dict[Any, Any]:
     """
 
@@ -448,7 +442,7 @@ def run_test_config(
 
     app_config_rel_path = test_config["cluster"].get("app_config", None)
     app_config = _load_config(local_dir, app_config_rel_path)
-            
+
     compute_tpl_rel_path = test_config["cluster"].get("compute_template", None)
     compute_tpl = _load_config(local_dir, compute_tpl_rel_path)
 
@@ -472,8 +466,9 @@ def run_test_config(
         session_controller = SessionController(
             api_client=instantiate_api_client(
                 cli_token=GLOBAL_CONFIG["ANYSCALE_CLI_TOKEN"],
-                host=GLOBAL_CONFIG["ANYSCALE_HOST"]),
-            anyscale_api_client=sdk.api_client
+                host=GLOBAL_CONFIG["ANYSCALE_HOST"],
+            ),
+            anyscale_api_client=sdk.api_client,
         )
         session_id = None
         scd_id = None
@@ -484,24 +479,26 @@ def run_test_config(
             if not session_id:
                 logger.info("No session found.")
                 # Start session
-                session_options = dict(
-                    name=session_name,
-                    project_id=project_id)
+                session_options = dict(name=session_name, project_id=project_id)
 
                 if cluster_config is not None:
                     logging.info("Starting session with cluster config")
                     cluster_config_str = json.dumps(cluster_config)
                     session_options["cluster_config"] = cluster_config_str
-                    session_options["cloud_id"] = GLOBAL_CONFIG["ANYSCALE_CLOUD_ID"],
+                    session_options["cloud_id"] = (GLOBAL_CONFIG["ANYSCALE_CLOUD_ID"],)
                     session_options["uses_app_config"] = False
                 else:
                     logging.info("Starting session with app/compute config")
 
                     # Find/create compute template
-                    compute_tpl_id = create_or_find_compute_template(sdk, project_id, compute_tpl)
+                    compute_tpl_id = create_or_find_compute_template(
+                        sdk, project_id, compute_tpl
+                    )
 
                     # Find/create app config
-                    app_config_id = create_or_find_app_config(sdk, project_id, app_config)
+                    app_config_id = create_or_find_app_config(
+                        sdk, project_id, app_config
+                    )
                     build_id = wait_for_build_or_raise(sdk, app_config_id)
 
                     session_options["compute_template_id"] = compute_tpl_id
@@ -512,7 +509,8 @@ def run_test_config(
                     sdk=sdk,
                     stop_event=stop_event,
                     session_name=session_name,
-                    session_options=session_options)
+                    session_options=session_options,
+                )
 
             # Rsync up
             logger.info("Syncing files to session...")
@@ -521,7 +519,8 @@ def run_test_config(
                 source=None,
                 target=None,
                 config=None,
-                all_nodes=False)
+                all_nodes=False,
+            )
 
             _check_stop(stop_event)
 
@@ -531,13 +530,13 @@ def run_test_config(
             if smoke_test:
                 cmd_to_run += " --smoke-test"
 
-            logger.info(f"Running command in session {session_name}: \n"
-                         f"{cmd_to_run}")
+            logger.info(
+                f"Running command in session {session_name}: \n" f"{cmd_to_run}"
+            )
             result_queue.put(State("CMD_RUN", time.time(), None))
-            result = sdk.create_session_command(dict(
-                session_id=session_id,
-                shell_command=cmd_to_run
-            ))
+            result = sdk.create_session_command(
+                dict(session_id=session_id, shell_command=cmd_to_run)
+            )
 
             scd_id = result.result.id
             completed = result.result.finished_at is not None
@@ -551,7 +550,8 @@ def run_test_config(
                 if now > next_report:
                     logger.info(
                         f"... still waiting for command to finish "
-                        f"({int(now-start_wait)} seconds) ...")
+                        f"({int(now-start_wait)} seconds) ..."
+                    )
                     next_report = next_report + REPORT_S
 
                 result = sdk.get_session_command(session_command_id=scd_id)
@@ -570,10 +570,12 @@ def run_test_config(
                 temp_dir=temp_dir,
                 session_name=session_name,
                 remote_file=test_config["run"].get("results"),
-                session_controller=session_controller)
+                session_controller=session_controller,
+            )
 
             logs = get_command_logs(
-                session_controller, scd_id, test_config.get("log_lines", 50))
+                session_controller, scd_id, test_config.get("log_lines", 50)
+            )
 
             saved_artifacts = pull_artifacts_and_store_in_cloud(
                 temp_dir=temp_dir,
@@ -581,16 +583,23 @@ def run_test_config(
                 session_name=session_name,
                 test_name=test_name,
                 artifacts=test_config.get("artifacts", {}),
-                session_controller=session_controller)
+                session_controller=session_controller,
+            )
 
             logger.info("Fetched results and stored on the cloud. Returning.")
 
-            result_queue.put(State("END", time.time(), {
-                "status": "finished",
-                "last_logs": logs,
-                "results": results,
-                "artifacts": saved_artifacts
-            }))
+            result_queue.put(
+                State(
+                    "END",
+                    time.time(),
+                    {
+                        "status": "finished",
+                        "last_logs": logs,
+                        "results": results,
+                        "artifacts": saved_artifacts,
+                    },
+                )
+            )
 
         except Exception as e:
             logger.error(e, exc_info=True)
@@ -599,14 +608,14 @@ def run_test_config(
             if scd_id is not None:
                 try:
                     logs = get_command_logs(
-                        session_controller,
-                        scd_id,
-                        test_config.get("log_lines", 50))
+                        session_controller, scd_id, test_config.get("log_lines", 50)
+                    )
                 except Exception as e2:
                     logger.error(e2, exc_info=True)
 
-            result_queue.put(State(
-                "END", time.time(), {"status": "error", "last_logs": logs}))
+            result_queue.put(
+                State("END", time.time(), {"status": "error", "last_logs": logs})
+            )
         finally:
             _cleanup_session(sdk, session_id)
             shutil.rmtree(temp_dir)
@@ -664,10 +673,7 @@ def run_test_config(
 
 
 def run_test(
-        test_config_file: str,
-        test_name: str,
-        project_id: str,
-        smoke_test: bool = False
+    test_config_file: str, test_name: str, project_id: str, smoke_test: bool = False
 ):
     with open(test_config_file, "rt") as f:
         test_configs = yaml.load(f, Loader=yaml.FullLoader)
@@ -680,7 +686,8 @@ def run_test(
     if test_name not in test_config_dict:
         raise ValueError(
             f"Test with name `{test_name}` not found in test config file "
-            f"at `{test_config_file}`.")
+            f"at `{test_config_file}`."
+        )
 
     test_config = test_config_dict[test_name]
 
@@ -694,31 +701,30 @@ def run_test(
         local_dir = os.path.join(local_dir, test_config["local_dir"])
 
     result = run_test_config(
-        local_dir, project_id, test_name, test_config, smoke_test=smoke_test)
+        local_dir, project_id, test_name, test_config, smoke_test=smoke_test
+    )
 
     report_result(
         test_name=test_name,
         status=result.get("status", "invalid"),
         logs=result.get("last_logs", ""),
         results=result.get("results", {}),
-        artifacts=result.get("artifacts", {})
+        artifacts=result.get("artifacts", {}),
     )
 
     if should_report_error(result):
-        notify(
-            test_config.get("owner", {}),
-            result
-        )
+        notify(test_config.get("owner", {}), result)
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument(
-        "--test-config", type=str, required=True, help="Test config file")
+        "--test-config", type=str, required=True, help="Test config file"
+    )
+    parser.add_argument("--test-name", type=str, help="Test name in config")
     parser.add_argument(
-        "--test-name", type=str, help="Test name in config")
-    parser.add_argument(
-        "--smoke-test", action="store_true", help="Finish quickly for testing")
+        "--smoke-test", action="store_true", help="Finish quickly for testing"
+    )
     args, _ = parser.parse_known_args()
 
     run_test(
