@@ -2,6 +2,7 @@ steps:
   - label: Run xgboost_tests
     commands:
       - pip install -q -r requirements.txt
+      - pip install -U boto3 botocore
       - git clone -b release-automation https://github.com/krfricke/ray.git ~/ray
       - python e2e.py --test-config ~/ray/release/xgboost_tests/xgboost_tests.yaml --test-name tune_small
     env:
