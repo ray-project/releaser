@@ -11,6 +11,7 @@ steps:
       RELEASE_AWS_LOCATION: dev
       RELEASE_AWS_DB_NAME: ray_ci
       RELEASE_AWS_DB_TABLE: release_test_result
+      AWS_REGION: us-west-2
     agents:
       queue: runner_queue_branch
     plugins:
