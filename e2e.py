@@ -13,7 +13,7 @@ import sys
 import tempfile
 import time
 from queue import Empty
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, Tuple
 
 import yaml
 
@@ -240,7 +240,7 @@ def create_or_find_app_config(
             f"app configs."
         )
 
-        result = sdk.list_app_configs(project_id=project_id)
+        result = sdk.list_app_configs(project_id=project_id, count=50)
         for res in result.results:
             if res.name == app_config_hash:
                 app_config_id = res.id
@@ -353,6 +353,56 @@ def create_and_wait_for_session(
         time.sleep(1)
 
     return session_id
+
+
+def run_session_command(
+        sdk: AnyscaleSDK,
+        session_id: str,
+        cmd_to_run: str,
+        stop_event: multiprocessing.Event,
+        result_queue: multiprocessing.Queue,
+        env_vars: Dict[str, str],
+        state_str: str = "CMD_RUN"
+) -> Tuple[str, int]:
+    full_cmd = " ".join(
+        f"{k}={v}" for k, v in env_vars.items()) + " " + cmd_to_run
+
+    logger.info(
+        f"Running command in session {session_id}: \n" f"{full_cmd}"
+    )
+    result_queue.put(State(state_str, time.time(), None))
+    result = sdk.create_session_command(
+        dict(session_id=session_id, shell_command=full_cmd)
+    )
+
+    scd_id = result.result.id
+    completed = result.result.finished_at is not None
+
+    start_wait = time.time()
+    next_report = start_wait + REPORT_S
+    while not completed:
+        _check_stop(stop_event)
+
+        now = time.time()
+        if now > next_report:
+            logger.info(
+                f"... still waiting for command to finish "
+                f"({int(now - start_wait)} seconds) ..."
+            )
+            next_report = next_report + REPORT_S
+
+        result = sdk.get_session_command(session_command_id=scd_id)
+        completed = result.result.finished_at
+        time.sleep(1)
+
+    status_code = result.result.status_code
+
+    if status_code != 0:
+        raise RuntimeError(
+            f"Command returned non-success status: {status_code}"
+        )
+
+    return scd_id, status_code
 
 
 def get_command_logs(
@@ -524,11 +574,33 @@ def run_test_config(
 
             _check_stop(stop_event)
 
-            results_json = test_config["run"].get("results")
-            if not results_json:
+            results_json = test_config["run"].get("results", None)
+            if results_json is None:
                 results_json = "/tmp/release_test_out.json"
 
-            # Run command
+            env_vars = {
+                "RAY_ADDRESS": os.environ.get("RAY_ADDRESS", "auto"),
+                "TEST_OUTPUT_JSON": results_json,
+                "IS_SMOKE_TEST": "1" if smoke_test else "0",
+            }
+
+            # Optionally run preparation command
+            prepare_command = test_config["run"].get("prepare")
+            if prepare_command:
+                logger.info(
+                    f"Running preparation command: {prepare_command}"
+                )
+                run_session_command(
+                    sdk=sdk,
+                    session_id=session_id,
+                    cmd_to_run=prepare_command,
+                    stop_event=stop_event,
+                    result_queue=result_queue,
+                    env_vars=env_vars,
+                    state_str="CMD_PREPARE"
+                )
+
+            # Run release test command
             cmd_to_run = test_config["run"]["script"] + " "
 
             args = test_config["run"].get("args", [])
@@ -538,57 +610,28 @@ def run_test_config(
             if smoke_test:
                 cmd_to_run += " --smoke-test"
 
-            env_vars = {
-                "RAY_ADDRESS": os.environ.get("RAY_ADDRESS", "auto"),
-                "TEST_OUTPUT_JSON": results_json,
-                "IS_SMOKE_TEST": "1" if smoke_test else "0",
-            }
-
-            full_cmd = " ".join(
-                f"{k}={v}" for k, v in env_vars.items()) + " " + cmd_to_run
-
-            logger.info(
-                f"Running command in session {session_name}: \n" f"{full_cmd}"
+            scd_id, status_code = run_session_command(
+                sdk=sdk,
+                session_id=session_id,
+                cmd_to_run=cmd_to_run,
+                stop_event=stop_event,
+                result_queue=result_queue,
+                env_vars=env_vars,
+                state_str="CMD_RUN"
             )
-            result_queue.put(State("CMD_RUN", time.time(), None))
-            result = sdk.create_session_command(
-                dict(session_id=session_id, shell_command=full_cmd)
-            )
-
-            scd_id = result.result.id
-            completed = result.result.finished_at is not None
-
-            start_wait = time.time()
-            next_report = start_wait + REPORT_S
-            while not completed:
-                _check_stop(stop_event)
-
-                now = time.time()
-                if now > next_report:
-                    logger.info(
-                        f"... still waiting for command to finish "
-                        f"({int(now-start_wait)} seconds) ..."
-                    )
-                    next_report = next_report + REPORT_S
-
-                result = sdk.get_session_command(session_command_id=scd_id)
-                completed = result.result.finished_at
-                time.sleep(1)
-
-            status_code = result.result.status_code
-
-            if status_code != 0:
-                raise RuntimeError(
-                    f"Release test returned non-success status: {status_code}"
-                )
 
             logger.info(f"Command finished successfully.")
-            results = get_remote_json_content(
-                temp_dir=temp_dir,
-                session_name=session_name,
-                remote_file=results_json,
-                session_controller=session_controller,
-            )
+            if results_json:
+                results = get_remote_json_content(
+                    temp_dir=temp_dir,
+                    session_name=session_name,
+                    remote_file=results_json,
+                    session_controller=session_controller,
+                )
+            else:
+                results = {
+                    "passed": 1
+                }
 
             logs = get_command_logs(
                 session_controller, scd_id, test_config.get("log_lines", 50)
@@ -653,6 +696,13 @@ def run_test_config(
         try:
             state: State = result_queue.get(timeout=1)
         except (Empty, TimeoutError):
+            if time.time() > timeout_time:
+                stop_event.set()
+                logger.warning("Process timed out")
+                time.sleep(10)
+                process.terminate()
+                logger.warning("Terminating process")
+                break
             continue
 
         if not isinstance(state, State):
@@ -664,14 +714,6 @@ def run_test_config(
 
         elif state.state == "END":
             result = state.data
-            break
-
-        if time.time() > timeout_time:
-            stop_event.set()
-            logger.warning("Process timed out")
-            time.sleep(2)
-            process.terminate()
-            logger.warning("Terminating process")
             break
 
     while not result_queue.empty():
