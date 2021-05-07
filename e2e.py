@@ -524,18 +524,36 @@ def run_test_config(
 
             _check_stop(stop_event)
 
+            results_json = test_config["run"].get("results")
+            if not results_json:
+                results_json = "/tmp/release_test_out.json"
+
             # Run command
             python_cmd = test_config["run"]["script"]
             cmd_to_run = f"python {python_cmd} "
+
+            args = test_config["run"].get("args", [])
+            if args:
+                cmd_to_run += " ".join(args) + " "
+
             if smoke_test:
                 cmd_to_run += " --smoke-test"
 
+            env_vars = {
+                "RAY_ADDRESS": os.environ.get("RAY_ADDRESS", "auto"),
+                "TEST_OUTPUT_JSON": results_json,
+                "IS_SMOKE_TEST": "1" if smoke_test else "0",
+            }
+
+            full_cmd = " ".join(
+                f"{k}={v}" for k, v in env_vars.items()) + " " + cmd_to_run
+
             logger.info(
-                f"Running command in session {session_name}: \n" f"{cmd_to_run}"
+                f"Running command in session {session_name}: \n" f"{full_cmd}"
             )
             result_queue.put(State("CMD_RUN", time.time(), None))
             result = sdk.create_session_command(
-                dict(session_id=session_id, shell_command=cmd_to_run)
+                dict(session_id=session_id, shell_command=full_cmd)
             )
 
             scd_id = result.result.id
@@ -569,7 +587,7 @@ def run_test_config(
             results = get_remote_json_content(
                 temp_dir=temp_dir,
                 session_name=session_name,
-                remote_file=test_config["run"].get("results"),
+                remote_file=results_json,
                 session_controller=session_controller,
             )
 
