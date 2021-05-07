@@ -740,10 +740,15 @@ if __name__ == "__main__":
         "--test-config", type=str, required=True, help="Test config file"
     )
     parser.add_argument("--test-name", type=str, help="Test name in config")
+    parser.add_argument("--ray-wheels", required=False, type=str,
+                        help="URL to ray wheels")
     parser.add_argument(
         "--smoke-test", action="store_true", help="Finish quickly for testing"
     )
     args, _ = parser.parse_known_args()
+
+    if args.ray_wheels:
+        os.environ["RAY_WHEELS"] = str(args.ray_wheels)
 
     run_test(
         test_config_file=args.test_config,
