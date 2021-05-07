@@ -529,8 +529,7 @@ def run_test_config(
                 results_json = "/tmp/release_test_out.json"
 
             # Run command
-            python_cmd = test_config["run"]["script"]
-            cmd_to_run = f"python {python_cmd} "
+            cmd_to_run = test_config["run"]["script"] + " "
 
             args = test_config["run"].get("args", [])
             if args:
