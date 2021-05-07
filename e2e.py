@@ -118,7 +118,7 @@ def _load_config(local_dir: str, config_file: Optional[str]) -> Optional[Dict]:
     return yaml.safe_load(content)
 
 
-def should_report_error(result: Dict[Any, Any]) -> bool:
+def has_errored(result: Dict[Any, Any]) -> bool:
     return result.get("status", "invalid") != "success"
 
 
@@ -721,16 +721,20 @@ def run_test(
         local_dir, project_id, test_name, test_config, smoke_test=smoke_test
     )
 
+    last_logs = result.get("last_logs", "No logs.")
     report_result(
         test_name=test_name,
         status=result.get("status", "invalid"),
-        logs=result.get("last_logs", ""),
+        logs=last_logs,
         results=result.get("results", {}),
         artifacts=result.get("artifacts", {}),
     )
 
-    if should_report_error(result):
+    if has_errored(result):
         notify(test_config.get("owner", {}), result)
+        raise RuntimeError(last_logs)
+
+    return
 
 
 if __name__ == "__main__":
