@@ -1,43 +1,40 @@
+setup: &setup
+  env:
+    ANYSCALE_CLOUD_ID: cld_4F7k8814aZzGG8TNUGPKnc
+    ANYSCALE_PROJECT: prj_2xR6uT6t7jJuu1aCwWMsle # e2e-tests in release-automation@
+    RELEASE_AWS_BUCKET: ray-release-automation-results
+    RELEASE_AWS_LOCATION: dev
+    RELEASE_AWS_DB_NAME: ray_ci
+    RELEASE_AWS_DB_TABLE: release_test_result
+    AWS_REGION: us-west-2
+  agents:
+    queue: runner_queue_branch
+  plugins:
+    - docker#v3.8.0:
+        image: "rayproject/ray"
+        propagate-environment: true
+
 steps:
-  - label: Run xgboost test tune_small
+  - label: Run microbenchmark
+    <<: *setup
     commands:
       - pip install -q -r requirements.txt
-      # secretsmanager and rds-data needs higher level boto
       - pip install -U boto3 botocore
-      - git clone -b release-automation https://github.com/krfricke/ray.git ~/ray
-      - python e2e.py --test-config ~/ray/release/xgboost_tests/xgboost_tests.yaml --test-name tune_small
-    env:
-      ANYSCALE_CLOUD_ID: cld_4F7k8814aZzGG8TNUGPKnc
-      ANYSCALE_PROJECT: prj_2xR6uT6t7jJuu1aCwWMsle # e2e-tests in release-automation@
-      RELEASE_AWS_BUCKET: ray-release-automation-results
-      RELEASE_AWS_LOCATION: dev
-      RELEASE_AWS_DB_NAME: ray_ci
-      RELEASE_AWS_DB_TABLE: release_test_result
-      AWS_REGION: us-west-2
-    agents:
-      queue: runner_queue_branch
-    plugins:
-      - docker#v3.8.0:
-          image: "rayproject/ray"
-          propagate-environment: true
-  - label: Run nightly test shuffle_10gb
+      - git clone https://github.com/ray-project/ray.git ~/ray
+      - python e2e.py --test-config ~/ray/release/microbenchmark/microbenchmark.yaml --test-name microbenchmark
+
+  - label: Run xgboost test tune_small
+    <<: *setup
     commands:
       - pip install -q -r requirements.txt
-      # secretsmanager and rds-data needs higher level boto
+      - pip install -U boto3 botocore
+      - git clone https://github.com/ray-project/ray.git ~/ray
+      - python e2e.py --test-config ~/ray/release/xgboost_tests/xgboost_tests.yaml --test-name tune_small
+
+  - label: Run nightly test shuffle_10gb
+    <<: *setup
+    commands:
+      - pip install -q -r requirements.txt
       - pip install -U boto3 botocore
       - git clone -b release-shuffle https://github.com/ericl/ray.git ~/ray
       - python e2e.py --test-config ~/ray/release/nightly_tests/nightly_tests.yaml --test-name shuffle_10gb
-    env:
-      ANYSCALE_CLOUD_ID: cld_4F7k8814aZzGG8TNUGPKnc
-      ANYSCALE_PROJECT: prj_2xR6uT6t7jJuu1aCwWMsle # e2e-tests in release-automation@
-      RELEASE_AWS_BUCKET: ray-release-automation-results
-      RELEASE_AWS_LOCATION: dev
-      RELEASE_AWS_DB_NAME: ray_ci
-      RELEASE_AWS_DB_TABLE: release_test_result
-      AWS_REGION: us-west-2
-    agents:
-      queue: runner_queue_branch
-    plugins:
-      - docker#v3.8.0:
-          image: "rayproject/ray"
-          propagate-environment: true
