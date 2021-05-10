@@ -119,7 +119,7 @@ def _load_config(local_dir: str, config_file: Optional[str]) -> Optional[Dict]:
 
 
 def has_errored(result: Dict[Any, Any]) -> bool:
-    return result.get("status", "invalid") != "success"
+    return result.get("status", "invalid") != "finished"
 
 
 def report_result(
@@ -479,7 +479,7 @@ def run_test_config(
 
     Returns:
         Dict with the following entries:
-            status (str): One of [success, error, timeout]
+            status (str): One of [finished, error, timeout]
             command_link (str): Link to command (Anyscale web UI)
             last_logs (str): Last logs (excerpt) to send to owner
             artifacts (dict): Dict of artifacts
