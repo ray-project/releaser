@@ -1,6 +1,7 @@
 import argparse
 import boto3
 import collections
+import copy
 import datetime
 import hashlib
 import jinja2
@@ -114,7 +115,10 @@ def _load_config(local_dir: str, config_file: Optional[str]) -> Optional[Dict]:
         # Todo: jinja2 render
         content = f.read()
 
-    content = jinja2.Template(content).render(env=GLOBAL_CONFIG)
+    env = copy.deepcopy(os.environ)
+    env.update(GLOBAL_CONFIG)
+
+    content = jinja2.Template(content).render(env=env)
     return yaml.safe_load(content)
 
 
