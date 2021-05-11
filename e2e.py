@@ -9,12 +9,14 @@ import json
 import logging
 import multiprocessing
 import os
+import requests
 import shutil
+import subprocess
 import sys
 import tempfile
 import time
 from queue import Empty
-from typing import Any, Dict, Optional, Tuple
+from typing import Any, Dict, Optional, Tuple, List
 
 import yaml
 
@@ -43,6 +45,10 @@ GLOBAL_CONFIG = {
     "ANYSCALE_PROJECT": os.environ.get(
         "ANYSCALE_PROJECT", "prj_3dcxfLlSDL6HTav8k4NbTb"
     ),  # kf-dev
+    "RAY_VERSION": os.environ.get("RAY_VERSION",
+                                  "2.0.0.dev0"),
+    "RAY_REPO": os.environ.get("RAY_REPO", "https://github.com/ray-project/ray.git"),
+    "RAY_BRANCH": os.environ.get("RAY_BRANCH", "master"),
     "RELEASE_AWS_BUCKET": os.environ.get(
         "RELEASE_AWS_BUCKET", "ray-release-automation-results"
     ),
@@ -83,6 +89,47 @@ class State:
 
 
 sys.path.insert(0, anyscale.ANYSCALE_RAY_DIR)
+
+
+def wheel_url(ray_version, git_branch, git_commit):
+    return f"https://s3-us-west-2.amazonaws.com/ray-wheels/" \
+           f"{git_branch}/{git_commit}/" \
+           f"ray-{ray_version}-cp37-cp37m-manylinux2014_x86_64.whl"
+
+
+def wheel_exists(ray_version, git_branch, git_commit):
+    url = wheel_url(ray_version, git_branch, git_commit)
+    return requests.head(url).status_code == 200
+
+
+def get_latest_commits(repo: str, branch: str = "master") -> List[str]:
+    cur = os.getcwd()
+    with tempfile.TemporaryDirectory() as tmpdir:
+        os.chdir(tmpdir)
+
+        clone_cmd = [
+            "git",
+            "clone",
+            "--filter=tree:0",
+            "--no-checkout",
+            # "--single-branch",
+            # "--depth=10",
+            f"--branch={branch}",
+            repo,
+            tmpdir,
+        ]
+        log_cmd = [
+            "git",
+            "log",
+            "-n",
+            "10",
+            "--pretty=format:%H",
+        ]
+
+        subprocess.check_output(clone_cmd)
+        commits = subprocess.check_output(log_cmd).decode(sys.stdout.encoding).split("\n")
+    os.chdir(cur)
+    return commits
 
 
 def _check_stop(stop_event: multiprocessing.Event):
@@ -798,6 +845,25 @@ if __name__ == "__main__":
 
     if args.ray_wheels:
         os.environ["RAY_WHEELS"] = str(args.ray_wheels)
+    else:
+        version = GLOBAL_CONFIG["RAY_VERSION"]
+        repo = GLOBAL_CONFIG["RAY_REPO"]
+        branch = GLOBAL_CONFIG["RAY_BRANCH"]
+
+        url = None
+        commits = get_latest_commits(repo, branch)
+        logger.info(f"Latest 10 commits for branch {branch}: {commits}")
+        for commit in commits:
+            if wheel_exists(version, branch, commit):
+                url = wheel_url(version, branch, commit)
+                os.environ["RAY_WHEELS"] = url
+                logger.info(
+                    f"Found wheels URL for Ray {version}, branch {branch}: "
+                    f"{url}")
+                break
+        if not url:
+            raise RuntimeError(
+                f"Could not find wheels for Ray {version}, branch {branch}")
 
     run_test(
         test_config_file=args.test_config,
