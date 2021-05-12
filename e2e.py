@@ -55,14 +55,44 @@ The script will have access to these environment variables:
     "TEST_OUTPUT_JSON": results_json_filename
     "IS_SMOKE_TEST": "1" if smoke_test else "0"
 
+For an example, take a look at the XGBoost test suite:
+
+https://github.com/ray-project/ray/blob/master/release/xgboost_tests/xgboost_tests.yaml
+
+These all use the same app configs and similar compute templates. This means
+that app configs can be re-used across runs and only have to be built ones.
+
+App configs and compute templates can interpret environment variables.
+A notable one is the `RAY_WHEELS` variable which points to the wheels that
+should be tested (e.g. latest master wheels). You might want to include
+something like this in your `post_build_cmds`:
+
+  - pip3 install -U {{ env["RAY_WHEELS"] | default("ray") }}
+
+If you want to force rebuilds, consider using something like
+
+  - echo {{ env["TIMESTAMP"] }}
+
+so that your app configs changes each time the script is executed. If you
+only want to trigger rebuilds once per day, use `DATESTAMP` instead:
+
+  - echo {{ env["DATESTAMP"] }}
+
+
 Local testing
 -------------
 For local testing, make sure to authenticate with the ray-ossci AWS user
 (e.g. by setting the respective environment variables obtained from go/aws).
 
-The script can then be run like this:
+Also make sure to set these environment variables:
+
+- ANYSCALE_CLI_TOKEN (should contain your anyscale credential token)
+- ANYSCALE_PROJECT (should point to a project ID you have access to)
+
+A test can then be run like this:
 
 python e2e.py --test-config ~/ray/release/xgboost_tests/xgboost_tests.yaml --test-name tune_small
+
 
 Release test yaml example
 -------------------------
@@ -159,6 +189,8 @@ GLOBAL_CONFIG = {
         "RELEASE_AWS_DB_RESOURCE_ARN",
         "arn:aws:rds:us-west-2:029272617770:cluster:ci-reporting",
     ),
+    "DATESTAMP": datetime.datetime.now().strftime("%Y%m%d"),
+    "TIMESTAMP": int(datetime.datetime.now().timestamp()),
 }
 
 REPORT_S = 30
