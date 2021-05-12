@@ -1,3 +1,97 @@
+"""
+This is an end to end release test automation script used to kick off periodic
+release tests, running on Anyscale.
+
+The tool leverages app configs and compute templates.
+
+Calling this script will run a single release test.
+
+Example:
+
+python e2e.py --test-config ~/ray/release/xgboost_tests/xgboost_tests.yaml --test-name tune_small
+
+The following steps are then performed:
+
+1. It will look up the test tune_small in the file xgboost_tests.yaml
+2. It will fetch the specified app config and compute template and register
+   those with anyscale (if they don’t exist yet)
+3. It waits until the app config is built
+4. It then kicks off the script defined in the run block
+5. When the script is finished, it will fetch the latest logs, the full log
+   output, and any artifacts specified in the artifacts block.
+6. The full logs and artifacts will be stored in a s3 bucket
+7. It will also fetch the json file specified in the run block as results.
+   This is the file where you should write your metrics to.
+8. All results are then stored in a database.
+   Specifically it will store the following fields:
+   - Timestamp
+   - Test name
+   - Status (finished, error, timeout, invalid)
+   - Last logs (50 lines)
+   - results (see above)
+   - artifacts (links to s3 files)
+
+Then the script exits. If an error occurs at any time, a fail result is
+written to the database.
+
+
+Writing a new release test
+--------------------------
+Each release test requires the following:
+
+1. It has to be added in a release test yaml file, describing meta information
+   about the test (e.g. name, command to run, timeout)
+2. You need an app config yaml
+3. You need a compute template yaml
+4. You need to define a command to run. This is usually a python script.
+   The command should accept (or ignore) a single optional
+   `--smoke-test` argument.
+   Usually the command should write its result metrics to a json file.
+   The json filename is available in the TEST_OUTPUT_JSON env variable.
+
+The script will have access to these environment variables:
+
+    "RAY_ADDRESS": os.environ.get("RAY_ADDRESS", "auto")
+    "TEST_OUTPUT_JSON": results_json_filename
+    "IS_SMOKE_TEST": "1" if smoke_test else "0"
+
+Local testing
+-------------
+For local testing, make sure to authenticate with the ray-ossci AWS user
+(e.g. by setting the respective environment variables obtained from go/aws).
+
+The script can then be run like this:
+
+python e2e.py --test-config ~/ray/release/xgboost_tests/xgboost_tests.yaml --test-name tune_small
+
+Release test yaml example
+-------------------------
+- name: example
+  owner:
+    mail: "kai@anyscale.com"  # Currently not used
+    slack: "@tune-team"  # Currentl not used
+
+  cluster:
+    app_config: app_config.yaml  # Relative to the release test yaml
+    compute_template: tpl_cpu.yaml
+
+  run:
+    timeout: 600  # in seconds
+    prepare: python wait_cluster.py 4 600  # prepare cmd to run before test
+    script: python workloads/train.py  # actual release test command
+
+  # This block is optional
+  artifacts:
+    # Artifact name: location on head node
+    - detailed_output: detailed_output.csv
+
+  # This block is optional. If present, the contents will be
+  # deep updated for smoke testing
+  smoke_test:
+    cluster:
+      compute_template: tpl_cpu_smoketest.yaml
+
+"""
 import argparse
 import boto3
 import collections
