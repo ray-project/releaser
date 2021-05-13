@@ -189,8 +189,8 @@ GLOBAL_CONFIG = {
         "RELEASE_AWS_DB_RESOURCE_ARN",
         "arn:aws:rds:us-west-2:029272617770:cluster:ci-reporting",
     ),
-    "DATESTAMP": datetime.datetime.now().strftime("%Y%m%d"),
-    "TIMESTAMP": int(datetime.datetime.now().timestamp()),
+    "DATESTAMP": str(datetime.datetime.now().strftime("%Y%m%d")),
+    "TIMESTAMP": str(int(datetime.datetime.now().timestamp())),
 }
 
 REPORT_S = 30
