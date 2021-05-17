@@ -161,6 +161,8 @@ logger.addHandler(handler)
 
 
 GLOBAL_CONFIG = {
+    "ANYSCALE_USER": os.environ.get("ANYSCALE_USER",
+                                    "release-automation@anyscale.com"),
     "ANYSCALE_HOST": os.environ.get("ANYSCALE_HOST", "https://beta.anyscale.com"),
     "ANYSCALE_CLI_TOKEN": os.environ.get("ANYSCALE_CLI_TOKEN"),
     "ANYSCALE_CLOUD_ID": os.environ.get(
@@ -191,6 +193,15 @@ GLOBAL_CONFIG = {
     ),
     "DATESTAMP": str(datetime.datetime.now().strftime("%Y%m%d")),
     "TIMESTAMP": str(int(datetime.datetime.now().timestamp())),
+    "EXPIRATION_1D": str(
+        (datetime.datetime.now() + datetime.timedelta(days=1)).strftime(
+            "%Y-%m-%d")),
+    "EXPIRATION_2D": str(
+        (datetime.datetime.now() + datetime.timedelta(days=2)).strftime(
+            "%Y-%m-%d")),
+    "EXPIRATION_3D": str(
+        (datetime.datetime.now() + datetime.timedelta(days=3)).strftime(
+            "%Y-%m-%d")),
 }
 
 REPORT_S = 30
@@ -651,6 +662,7 @@ def run_test_config(
     test_name: str,
     test_config: Dict[Any, Any],
     smoke_test: bool = False,
+    no_terminate: bool = False,
 ) -> Dict[Any, Any]:
     """
 
@@ -854,7 +866,12 @@ def run_test_config(
                 State("END", time.time(), {"status": "error", "last_logs": logs})
             )
         finally:
-            _cleanup_session(sdk, session_id)
+            if no_terminate:
+                logger.warning(
+                    "`no_terminate` is set to True, so the session will "
+                    "*not* be terminated!")
+            else:
+                _cleanup_session(sdk, session_id)
             shutil.rmtree(temp_dir)
 
     timeout = test_config["run"].get("timeout", 1800)
@@ -909,7 +926,8 @@ def run_test_config(
 
 
 def run_test(
-    test_config_file: str, test_name: str, project_id: str, smoke_test: bool = False
+    test_config_file: str, test_name: str, project_id: str, smoke_test: bool = False,
+    no_terminate: bool = False
 ):
     with open(test_config_file, "rt") as f:
         test_configs = yaml.load(f, Loader=yaml.FullLoader)
@@ -937,7 +955,8 @@ def run_test(
         local_dir = os.path.join(local_dir, test_config["local_dir"])
 
     result = run_test_config(
-        local_dir, project_id, test_name, test_config, smoke_test=smoke_test
+        local_dir, project_id, test_name, test_config, smoke_test=smoke_test,
+        no_terminate=no_terminate
     )
 
     last_logs = result.get("last_logs", "No logs.")
@@ -964,6 +983,9 @@ if __name__ == "__main__":
     parser.add_argument("--test-name", type=str, help="Test name in config")
     parser.add_argument("--ray-wheels", required=False, type=str,
                         help="URL to ray wheels")
+    parser.add_argument(
+        "--no-terminate", action="store_true", default=False, help="Don't terminate session after failure"
+    )
     parser.add_argument(
         "--smoke-test", action="store_true", help="Finish quickly for testing"
     )
@@ -996,4 +1018,5 @@ if __name__ == "__main__":
         test_name=args.test_name,
         project_id=GLOBAL_CONFIG["ANYSCALE_PROJECT"],
         smoke_test=args.smoke_test,
+        no_terminate=args.no_terminate,
     )
