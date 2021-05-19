@@ -52,6 +52,7 @@ def build_pipeline(steps):
     RAY_REPO = os.environ.get("RAY_REPO", "https://github.com/ray-project/ray.git")
 
     for test_file, test_names in steps.items():
+        test_base = os.path.basename(test_file)
         for test_name in test_names:
             step_conf = copy.deepcopy(DEFAULT_STEP_TEMPLATE)
 
@@ -67,6 +68,8 @@ def build_pipeline(steps):
                 f"git clone -b {RAY_BRANCH} {RAY_REPO} ~/ray",
                 cmd,
             ]
+
+            step_conf["label"] = f"{test_base}: {test_name}"
             all_steps.append(step_conf)
 
     return all_steps
