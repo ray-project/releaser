@@ -69,7 +69,7 @@ def build_pipeline(steps):
                 cmd,
             ]
 
-            step_conf["label"] = f"{test_base}: {test_name}"
+            step_conf["label"] = f"({RAY_BRANCH}) {test_base}: {test_name}"
             all_steps.append(step_conf)
 
     return all_steps
