@@ -43,9 +43,9 @@ def build_pipeline(steps):
         for test_name in test_names:
             step_conf = copy.deepcopy(DEFAULT_STEP_TEMPLATE)
 
-            cmd = ("python e2e.py "
-                   "--ray-branch ${RAY_BRANCH} "
-                   "--category ${RAY_BRANCH} "
+            cmd = (f"python e2e.py "
+                   f"--ray-branch ${{RAY_BRANCH}} "
+                   f"--category ${{RAY_BRANCH}} "
                    f"--test-config {test_file} "
                    f"--test-name {test_name}")
 
