@@ -33,7 +33,7 @@ DEFAULT_STEP_TEMPLATE = {
             }
         }
     ],
-    "steps": []
+    "commands": []
 }
 
 
