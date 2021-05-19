@@ -428,11 +428,20 @@ def create_or_find_app_config(
             f"app configs."
         )
 
-        result = sdk.list_app_configs(project_id=project_id, count=50)
-        for res in result.results:
-            if res.name == app_config_hash:
-                app_config_id = res.id
-                logger.info(f"App config already exists with ID {app_config_id}")
+        paging_token = None
+        while not app_config_id:
+            result = sdk.list_app_configs(
+                project_id=project_id, count=50, paging_token=paging_token)
+            paging_token = result.metadata.next_paging_token
+
+            for res in result.results:
+                if res.name == app_config_hash:
+                    app_config_id = res.id
+                    logger.info(f"App config already exists with ID {app_config_id}")
+                    break
+
+            if not paging_token:
+                logger.info("App config not found. Creating new one.")
                 break
 
         if not app_config_id:
