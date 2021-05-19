@@ -43,11 +43,11 @@ def build_pipeline(steps):
         for test_name in test_names:
             step_conf = copy.deepcopy(DEFAULT_STEP_TEMPLATE)
 
-            cmd = (f"python e2e.py "
-                   f"--ray-branch ${{RAY_BRANCH}} "
-                   f"--category ${{RAY_BRANCH}} "
-                   f"--test-config {test_file} "
-                   f"--test-name {test_name}")
+            cmd = str(f"python e2e.py "
+                      f"--ray-branch ${{RAY_BRANCH}} "
+                      f"--category ${{RAY_BRANCH}} "
+                      f"--test-config {test_file} "
+                      f"--test-name {test_name}")
 
             step_conf["steps"] = [
                 "pip install -q -r requirements.txt",
