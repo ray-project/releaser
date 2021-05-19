@@ -49,7 +49,7 @@ def build_pipeline(steps):
                       f"--test-config {test_file} "
                       f"--test-name {test_name}")
 
-            step_conf["steps"] = [
+            step_conf["commands"] = [
                 "pip install -q -r requirements.txt",
                 "pip install -U boto3 botocore",
                 "git clone -b ${RAY_BRANCH} https://github.com/ray-project/ray.git ~/ray",
