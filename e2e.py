@@ -320,13 +320,9 @@ def has_errored(result: Dict[Any, Any]) -> bool:
     return result.get("status", "invalid") != "finished"
 
 
-def report_result(
-        test_name: str,
-        status: str,
-        logs: str,
-        results: Dict[Any, Any],
-        artifacts: Dict[Any, Any],
-):
+def report_result(test_name: str, status: str, logs: str,
+                  results: Dict[Any, Any], artifacts: Dict[Any, Any],
+                  category: str):
     now = datetime.datetime.utcnow()
     rds_data_client = boto3.client("rds-data", region_name="us-west-2")
 
@@ -334,8 +330,8 @@ def report_result(
 
     sql = (
         f"INSERT INTO {schema} "
-        f"(created_on, test_name, status, last_logs, results, artifacts) "
-        f"VALUES (:created_on, :test_name, :status, :last_logs, :results, :artifacts)"
+        f"(created_on, test_name, status, last_logs, results, artifacts, category) "
+        f"VALUES (:created_on, :test_name, :status, :last_logs, :results, :artifacts, :category)"
     )
 
     rds_data_client.execute_statement(
@@ -379,6 +375,12 @@ def report_result(
                 "value": {
                     "stringValue": json.dumps(artifacts)
                 },
+            },
+            {
+                "name": "category",
+                "value": {
+                    "stringValue": category
+                }
             },
         ],
         secretArn=GLOBAL_CONFIG["RELEASE_AWS_DB_SECRET_ARN"],
@@ -471,7 +473,8 @@ def create_or_find_app_config(sdk: AnyscaleSDK, project_id: str,
                     break
 
             if not paging_token:
-                logger.info("App config not found. Creating new one.")
+                if not app_config_id:
+                    logger.info("App config not found. Creating new one.")
                 break
 
         if not app_config_id:
@@ -735,7 +738,7 @@ def get_latest_running_command_id(sdk: AnyscaleSDK, session_id: str
     scd_id = None
     paging_token = None
 
-    success = True
+    success = None
 
     while not scd_id:
         result = sdk.list_session_commands(
@@ -750,12 +753,15 @@ def get_latest_running_command_id(sdk: AnyscaleSDK, session_id: str
             completed = cmd.finished_at is not None
 
             if completed:
+                if success is None:
+                    success = True
+
                 success = success and cmd.status_code == 0
 
             if not completed:
                 return cmd.id, None
 
-    return scd_id, success
+    return scd_id, success or False
 
 
 def run_test_config(
@@ -1088,6 +1094,14 @@ def run_test_config(
                     results=latest_result)
                 should_terminate = True
 
+            elif success:
+                logger.info("All commands finished.")
+                _process_finished_command(
+                    session_controller=session_controller,
+                    scd_id=scd_id,
+                    results=latest_result)
+                should_terminate = True
+
             else:
                 rest_time = timeout - time.time() + session_state["start_time"]
                 logger.info(f"Test command should continue running "
@@ -1179,6 +1193,7 @@ def run_test_config(
 def run_test(test_config_file: str,
              test_name: str,
              project_id: str,
+             category: str = "unspecified",
              smoke_test: bool = False,
              no_terminate: bool = False,
              kick_off_only: bool = False,
@@ -1246,6 +1261,7 @@ def run_test(test_config_file: str,
             logs=last_logs,
             results=result.get("results", {}),
             artifacts=result.get("artifacts", {}),
+            category=category,
         )
 
         if has_errored(result):
@@ -1278,6 +1294,11 @@ if __name__ == "__main__":
         default=False,
         help="Check (long running) status")
     parser.add_argument(
+        "--category",
+        type=str,
+        default="unspecified",
+        help="Category name, e.g. `release-1.3.0` (will be saved in database)")
+    parser.add_argument(
         "--smoke-test", action="store_true", help="Finish quickly for testing")
     args, _ = parser.parse_known_args()
 
@@ -1307,6 +1328,7 @@ if __name__ == "__main__":
         test_config_file=args.test_config,
         test_name=args.test_name,
         project_id=GLOBAL_CONFIG["ANYSCALE_PROJECT"],
+        category=args.category,
         smoke_test=args.smoke_test,
         no_terminate=args.no_terminate or args.kick_off_only,
         kick_off_only=args.kick_off_only,
