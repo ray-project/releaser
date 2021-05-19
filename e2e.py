@@ -578,7 +578,7 @@ def run_session_command(sdk: AnyscaleSDK,
     completed = result.result.finished_at is not None
 
     if kick_off_only:
-        return scd_id, None
+        return scd_id, 0
 
     start_wait = time.time()
     next_report = start_wait + REPORT_S
@@ -670,6 +670,76 @@ def pull_artifacts_and_store_in_cloud(
     return saved_artifacts
 
 
+def find_session_by_test_name(
+        sdk: AnyscaleSDK,
+        session_controller: SessionController,
+        temp_dir: str,
+        state_json: str,
+        project_id: str,
+        test_name: str,
+) -> Optional[Tuple[str, str, Dict[Any, Any]]]:
+    paging_token = None
+
+    while True:  # Will break if paging_token is None after first search
+        result = sdk.search_sessions(
+            project_id=project_id,
+            sessions_query=dict(
+                name=dict(contains=test_name),
+                state_filter=["Running"],
+                paging=dict(count=20, paging_token=paging_token)))
+
+        for session in result.results:
+            logger.info(f"Found sessions {session.name}")
+            if not session.name.startswith(test_name):
+                continue
+
+            try:
+                session_state = get_remote_json_content(
+                    temp_dir=temp_dir,
+                    session_name=session.name,
+                    remote_file=state_json,
+                    session_controller=session_controller)
+            except Exception as exc:
+                raise RuntimeError(f"Could not get remote json content "
+                                   f"for session {session.name}") from exc
+
+            if session_state.get("test_name") == test_name:
+                return session.id, session.name, session_state
+
+        session_token = result.metadata.next_paging_token
+
+        if not session_token:
+            return None
+
+
+def get_latest_running_command_id(sdk: AnyscaleSDK, session_id: str
+                                  ) -> Tuple[Optional[str], Optional[bool]]:
+    scd_id = None
+    paging_token = None
+
+    success = True
+
+    while not scd_id:
+        result = sdk.list_session_commands(
+            session_id=session_id, paging_token=paging_token)
+
+        paging_token = result.metadata.next_paging_token
+
+        for cmd in result.results:
+            if not scd_id:
+                scd_id = cmd.id
+
+            completed = cmd.finished_at is not None
+
+            if completed:
+                success = success and cmd.status_code == 0
+
+            if not completed:
+                return cmd.id, None
+
+    return scd_id, success
+
+
 def run_test_config(
         local_dir: str,
         project_id: str,
@@ -678,6 +748,7 @@ def run_test_config(
         smoke_test: bool = False,
         no_terminate: bool = False,
         kick_off_only: bool = False,
+        check_progress: bool = False,
 ) -> Dict[Any, Any]:
     """
 
@@ -724,11 +795,31 @@ def run_test_config(
         "IS_SMOKE_TEST": "1" if smoke_test else "0",
     }
 
+    # Setup interface
+    # Unfortunately, there currently seems to be no great way to
+    # transfer files with the Anyscale SDK.
+    # So we use the session controller instead.
+    sdk = AnyscaleSDK(auth_token=GLOBAL_CONFIG["ANYSCALE_CLI_TOKEN"])
+    session_controller = SessionController(
+        api_client=instantiate_api_client(
+            cli_token=GLOBAL_CONFIG["ANYSCALE_CLI_TOKEN"],
+            host=GLOBAL_CONFIG["ANYSCALE_HOST"],
+        ),
+        anyscale_api_client=sdk.api_client,
+    )
+
+    with open(os.path.join(local_dir, ".anyscale.yaml"), "wt") as f:
+        f.write(f"project_id: {project_id}")
+    os.chdir(local_dir)
+
+    timeout = test_config["run"].get("timeout", 1800)
+
     def _process_finished_command(session_controller: SessionController,
-                                  scd_id: str):
+                                  scd_id: str,
+                                  results: Optional[Dict] = None):
         logger.info(f"Command finished successfully.")
         if results_json:
-            results = get_remote_json_content(
+            results = results or get_remote_json_content(
                 temp_dir=temp_dir,
                 session_name=session_name,
                 remote_file=results_json,
@@ -737,8 +828,11 @@ def run_test_config(
         else:
             results = {"passed": 1}
 
-        logs = get_command_logs(session_controller, scd_id,
-                                test_config.get("log_lines", 50))
+        if scd_id:
+            logs = get_command_logs(session_controller, scd_id,
+                                    test_config.get("log_lines", 50))
+        else:
+            logs = "No command found to fetch logs for"
 
         saved_artifacts = pull_artifacts_and_store_in_cloud(
             temp_dir=temp_dir,
@@ -764,25 +858,8 @@ def run_test_config(
             ))
 
     def _run(logger):
-        # Unfortunately, there currently seems to be no great way to
-        # transfer files with the Anyscale SDK.
-        # So we use the session controller instead.
-        with open(os.path.join(local_dir, ".anyscale.yaml"), "wt") as f:
-            f.write(f"project_id: {project_id}")
-        os.chdir(local_dir)
-
-        # Setup interface
-        sdk = AnyscaleSDK(auth_token=GLOBAL_CONFIG["ANYSCALE_CLI_TOKEN"])
-        session_controller = SessionController(
-            api_client=instantiate_api_client(
-                cli_token=GLOBAL_CONFIG["ANYSCALE_CLI_TOKEN"],
-                host=GLOBAL_CONFIG["ANYSCALE_HOST"],
-            ),
-            anyscale_api_client=sdk.api_client,
-        )
         session_id = None
         scd_id = None
-
         try:
             # First, look for running sessions
             session_id = search_running_session(sdk, project_id, session_name)
@@ -823,7 +900,8 @@ def run_test_config(
                 )
 
             # Write test state json
-            with open(os.path.join(local_dir, "test_state.json"), "wt") as f:
+            test_state_file = os.path.join(local_dir, "test_state.json")
+            with open(test_state_file, "wt") as f:
                 json.dump({
                     "start_time": time.time(),
                     "test_name": test_name
@@ -835,6 +913,15 @@ def run_test_config(
                 session_name=session_name,
                 source=None,
                 target=None,
+                config=None,
+                all_nodes=False,
+            )
+
+            logger.info("Syncing test state to session...")
+            session_controller.push(
+                session_name=session_name,
+                source=test_state_file,
+                target=state_json,
                 config=None,
                 all_nodes=False,
             )
@@ -907,11 +994,115 @@ def run_test_config(
                     "*not* be terminated!")
             else:
                 _cleanup_session(sdk, session_id)
-            shutil.rmtree(temp_dir)
 
-    timeout = test_config["run"].get("timeout", 1800)
+    def _check_progress(logger):
+        should_terminate = False
+        session_id = None
+        scd_id = None
+        try:
+            existing_session = find_session_by_test_name(
+                sdk=sdk,
+                session_controller=session_controller,
+                temp_dir=temp_dir,
+                state_json=state_json,
+                project_id=project_id,
+                test_name=test_name)
 
-    process = multiprocessing.Process(target=_run, args=(logger, ))
+            if existing_session is None:
+                logger.info(f"Found no existing session for {test_name}")
+                result_queue.put(
+                    State("END", time.time(), {
+                        "status": "nosession",
+                        "last_logs": ""
+                    }))
+                return
+
+            session_id, session_name, session_state = existing_session
+
+            logger.info(f"Found existing session for {test_name}: "
+                        f"{session_name}")
+
+            scd_id, success = get_latest_running_command_id(
+                sdk=sdk, session_id=session_id)
+
+            latest_result = get_remote_json_content(
+                temp_dir=temp_dir,
+                session_name=session_name,
+                remote_file=results_json,
+                session_controller=session_controller,
+            )
+
+            # Fetch result json and check if it has been updated recently
+            result_time_key = test_config["run"].get("time_key", None)
+            maximum_update_delay = test_config["run"].get(
+                "max_update_delay", None)
+            if result_time_key and maximum_update_delay:
+                last_update = latest_result.get(result_time_key, None)
+                if not last_update:
+                    result_queue.put(
+                        State(
+                            "END", time.time(), {
+                                "status": "error",
+                                "last_logs": f"Test did not store {result_time_key} in the "
+                                f"results json."
+                            }))
+                    return
+                if last_update - time.time() > maximum_update_delay:
+                    result_queue.put(
+                        State(
+                            "END", time.time(), {
+                                "status": "error",
+                                "last_logs": f"Test did not update the results json within "
+                                f"the last {maximum_update_delay} seconds."
+                            }))
+                    return
+
+            if time.time() - session_state["start_time"] > timeout:
+                # Long running test reached timeout
+                logger.info(
+                    f"Test command reached timeout after {timeout} seconds")
+                _process_finished_command(
+                    session_controller=session_controller,
+                    scd_id=scd_id,
+                    results=latest_result)
+                should_terminate = True
+
+            else:
+                rest_time = timeout - time.time() + session_state["start_time"]
+                logger.info(f"Test command should continue running "
+                            f"for {rest_time} seconds")
+                result_queue.put(
+                    State("END", time.time(), {
+                        "status": "kickoff",
+                        "last_logs": "Test is still running"
+                    }))
+
+        except Exception as e:
+            logger.error(e, exc_info=True)
+
+            logs = str(e)
+            if scd_id is not None:
+                try:
+                    logs = get_command_logs(session_controller, scd_id,
+                                            test_config.get("log_lines", 50))
+                except Exception as e2:
+                    logger.error(e2, exc_info=True)
+
+            result_queue.put(
+                State("END", time.time(), {
+                    "status": "error",
+                    "last_logs": logs
+                }))
+        finally:
+            if should_terminate:
+                logger.warning("Terminating session")
+                _cleanup_session(sdk, session_id)
+
+    if not check_progress:
+        process = multiprocessing.Process(target=_run, args=(logger, ))
+    else:
+        process = multiprocessing.Process(
+            target=_check_progress, args=(logger, ))
 
     logger.info(f"Starting process with timeout {timeout}")
     process.start()
@@ -957,6 +1148,8 @@ def run_test_config(
 
     logger.info(f"Final results: {result}")
 
+    shutil.rmtree(temp_dir)
+
     return result
 
 
@@ -998,19 +1191,35 @@ def run_test(test_config_file: str,
         test_config,
         smoke_test=smoke_test,
         no_terminate=no_terminate,
-        kick_off_only=kick_off_only)
+        kick_off_only=kick_off_only,
+        check_progress=check_progress)
+
+    status = result.get("status", "invalid")
 
     if kick_off_only:
+        if status != "kickoff":
+            raise RuntimeError("Error kicking off test.")
+
         logger.info("Kicked off test. It's now up to the `--check` "
                     "part of the script to track its process.")
         return
     else:
         # `--check` or no kick off only
+
+        if status == "nosession":
+            logger.info(f"No running session found for test {test_name}, so "
+                        f"assuming everything is fine.")
+            return
+
+        if status == "kickoff":
+            logger.info(f"Test {test_name} is still running.")
+            return
+
         last_logs = result.get("last_logs", "No logs.")
 
         report_result(
             test_name=test_name,
-            status=result.get("status", "invalid"),
+            status=status,
             logs=last_logs,
             results=result.get("results", {}),
             artifacts=result.get("artifacts", {}),
@@ -1051,7 +1260,7 @@ if __name__ == "__main__":
 
     if args.ray_wheels:
         os.environ["RAY_WHEELS"] = str(args.ray_wheels)
-    else:
+    elif not args.check:
         version = GLOBAL_CONFIG["RAY_VERSION"]
         repo = GLOBAL_CONFIG["RAY_REPO"]
         branch = GLOBAL_CONFIG["RAY_BRANCH"]
@@ -1076,7 +1285,7 @@ if __name__ == "__main__":
         test_name=args.test_name,
         project_id=GLOBAL_CONFIG["ANYSCALE_PROJECT"],
         smoke_test=args.smoke_test,
-        no_terminate=args.no_terminate or args.kick_off,
-        kick_off_only=args.kick_off,
+        no_terminate=args.no_terminate or args.kick_off_only,
+        kick_off_only=args.kick_off_only,
         check_progress=args.check,
     )
