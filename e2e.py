@@ -78,7 +78,6 @@ only want to trigger rebuilds once per day, use `DATESTAMP` instead:
 
   - echo {{ env["DATESTAMP"] }}
 
-
 Local testing
 -------------
 For local testing, make sure to authenticate with the ray-ossci AWS user
@@ -93,6 +92,21 @@ A test can then be run like this:
 
 python e2e.py --test-config ~/ray/release/xgboost_tests/xgboost_tests.yaml --test-name tune_small
 
+Long running tests
+------------------
+Long running tests can be kicked off with by adding the --kick-off-only parameter
+to the e2e script. The status can then be checked with the --check command.
+
+Long running test sessions will be terminated after `timeout` seconds, after which
+the latest result in the TEST_OUTPUT_JSON will be reported. Thus, long running
+release tests should update this file periodically.
+
+There are also two config options to configure behavior. The `time_key` is needed
+to track the latest update of the TEST_OUTPUT_JSON and should contain a floating
+point number (usually `time.time()`). The `max_update_delay` then specified
+the maximum time in seconds that can be passed without an update to the
+results json. If the output file hasn't been updated in e.g. 60 seconds, this
+could indicate that the command is stale/frozen, and thus should fail.
 
 Release test yaml example
 -------------------------
@@ -109,6 +123,10 @@ Release test yaml example
     timeout: 600  # in seconds
     prepare: python wait_cluster.py 4 600  # prepare cmd to run before test
     script: python workloads/train.py  # actual release test command
+
+    # Only needed for long running test
+    time_key: last_update  # Key in the results json indicating current time
+    max_update_delay: 30  # If state hasn't been updated in this time, terminate
 
   # This block is optional
   artifacts:
@@ -1036,8 +1054,10 @@ def run_test_config(
             result_time_key = test_config["run"].get("time_key", None)
             maximum_update_delay = test_config["run"].get(
                 "max_update_delay", None)
+
             if result_time_key and maximum_update_delay:
                 last_update = latest_result.get(result_time_key, None)
+
                 if not last_update:
                     result_queue.put(
                         State(
@@ -1047,15 +1067,16 @@ def run_test_config(
                                 f"results json."
                             }))
                     return
-                if last_update - time.time() > maximum_update_delay:
-                    result_queue.put(
-                        State(
-                            "END", time.time(), {
-                                "status": "error",
-                                "last_logs": f"Test did not update the results json within "
-                                f"the last {maximum_update_delay} seconds."
-                            }))
-                    return
+
+                delay = time.time() - last_update
+                logger.info(f"Last update was at {last_update:.2f}. "
+                            f"This was {delay:.2f} seconds ago "
+                            f"(maximum allowed: {maximum_update_delay})")
+
+                if delay > maximum_update_delay:
+                    raise RuntimeError(
+                        f"Test did not update the results json within "
+                        f"the last {maximum_update_delay} seconds.")
 
             if time.time() - session_state["start_time"] > timeout:
                 # Long running test reached timeout
@@ -1085,6 +1106,7 @@ def run_test_config(
                 try:
                     logs = get_command_logs(session_controller, scd_id,
                                             test_config.get("log_lines", 50))
+                    logs += f"\n{str(e)}"
                 except Exception as e2:
                     logger.error(e2, exc_info=True)
 
@@ -1093,6 +1115,7 @@ def run_test_config(
                     "status": "error",
                     "last_logs": logs
                 }))
+            should_terminate = True
         finally:
             if should_terminate:
                 logger.warning("Terminating session")
