@@ -3,13 +3,20 @@ import os
 import sys
 import yaml
 
-NIGHTLY_STEPS = {
+NIGHTLY_TESTS = {
     "~/ray/release/microbenchmark/microbenchmark.yaml": [
         "microbenchmark",
     ],
     "~/ray/release/xgboost_tests/xgboost_tests.yaml": [
         "train_small",
         "train_moderate",
+        "train_gpu",
+        "tune_small",
+        "tune_4x32",
+        "tune_32x4",
+        "ft_small_elastic",
+        "ft_small_non_elastic",
+        "distributed_api_test",
     ]
 }
 
@@ -66,6 +73,6 @@ def build_pipeline(steps):
 
 
 if __name__ == "__main__":
-    steps = build_pipeline(NIGHTLY_STEPS)
+    steps = build_pipeline(NIGHTLY_TESTS)
 
     yaml.dump({"steps": steps}, sys.stdout)
