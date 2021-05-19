@@ -1,4 +1,5 @@
 import copy
+import os
 import sys
 import yaml
 
@@ -39,20 +40,24 @@ DEFAULT_STEP_TEMPLATE = {
 
 def build_pipeline(steps):
     all_steps = []
+
+    RAY_BRANCH = os.environ.get("RAY_BRANCH", "master")
+    RAY_REPO = os.environ.get("RAY_REPO", "https://github.com/ray-project/ray.git")
+
     for test_file, test_names in steps.items():
         for test_name in test_names:
             step_conf = copy.deepcopy(DEFAULT_STEP_TEMPLATE)
 
             cmd = str(f"python e2e.py "
-                      f"--ray-branch ${{RAY_BRANCH}} "
-                      f"--category ${{RAY_BRANCH}} "
+                      f"--ray-branch {RAY_BRANCH} "
+                      f"--category {RAY_BRANCH} "
                       f"--test-config {test_file} "
                       f"--test-name {test_name}")
 
             step_conf["commands"] = [
                 "pip install -q -r requirements.txt",
                 "pip install -U boto3 botocore",
-                "git clone -b ${RAY_BRANCH} https://github.com/ray-project/ray.git ~/ray",
+                f"git clone -b {RAY_BRANCH} {RAY_REPO} ~/ray",
                 cmd,
             ]
             all_steps.append(step_conf)
