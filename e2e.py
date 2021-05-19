@@ -559,7 +559,8 @@ def run_session_command(
         stop_event: multiprocessing.Event,
         result_queue: multiprocessing.Queue,
         env_vars: Dict[str, str],
-        state_str: str = "CMD_RUN"
+        state_str: str = "CMD_RUN",
+        kick_off_only: bool = False
 ) -> Tuple[str, int]:
     full_cmd = " ".join(
         f"{k}={v}" for k, v in env_vars.items()) + " " + cmd_to_run
@@ -574,6 +575,9 @@ def run_session_command(
 
     scd_id = result.result.id
     completed = result.result.finished_at is not None
+
+    if kick_off_only:
+        return scd_id, None
 
     start_wait = time.time()
     next_report = start_wait + REPORT_S
@@ -665,6 +669,7 @@ def pull_artifacts_and_store_in_cloud(
     return saved_artifacts
 
 
+
 def run_test_config(
     local_dir: str,
     project_id: str,
@@ -672,6 +677,7 @@ def run_test_config(
     test_config: Dict[Any, Any],
     smoke_test: bool = False,
     no_terminate: bool = False,
+    kick_off_only: bool = False,
 ) -> Dict[Any, Any]:
     """
 
@@ -700,6 +706,66 @@ def run_test_config(
     session_name = f"{test_name}_{int(time.time())}"
 
     temp_dir = tempfile.mkdtemp()
+
+    # Result and state files
+    results_json = test_config["run"].get("results", None)
+    if results_json is None:
+        results_json = "/tmp/release_test_out.json"
+
+    state_json = test_config["run"].get("state", None)
+    if state_json is None:
+        state_json = "/tmp/release_test_state.json"
+
+    env_vars = {
+        "RAY_ADDRESS": os.environ.get("RAY_ADDRESS", "auto"),
+        "TEST_OUTPUT_JSON": results_json,
+        "TEST_STATE_JSON": state_json,
+        "IS_SMOKE_TEST": "1" if smoke_test else "0",
+    }
+
+    def _process_finished_command(
+            session_controller: SessionController,
+            scd_id: str):
+        logger.info(f"Command finished successfully.")
+        if results_json:
+            results = get_remote_json_content(
+                temp_dir=temp_dir,
+                session_name=session_name,
+                remote_file=results_json,
+                session_controller=session_controller,
+            )
+        else:
+            results = {
+                "passed": 1
+            }
+
+        logs = get_command_logs(
+            session_controller, scd_id, test_config.get("log_lines", 50)
+        )
+
+        saved_artifacts = pull_artifacts_and_store_in_cloud(
+            temp_dir=temp_dir,
+            logs=logs,  # Also save logs in cloud
+            session_name=session_name,
+            test_name=test_name,
+            artifacts=test_config.get("artifacts", {}),
+            session_controller=session_controller,
+        )
+
+        logger.info("Fetched results and stored on the cloud. Returning.")
+
+        result_queue.put(
+            State(
+                "END",
+                time.time(),
+                {
+                    "status": "finished",
+                    "last_logs": logs,
+                    "results": results,
+                    "artifacts": saved_artifacts,
+                },
+            )
+        )
 
     def _run(logger):
         # Unfortunately, there currently seems to be no great way to
@@ -760,6 +826,13 @@ def run_test_config(
                     session_options=session_options,
                 )
 
+            # Write test state json
+            with open(os.path.join(local_dir, "test_state.json"), "wt") as f:
+                json.dump({
+                    "start_time": time.time(),
+                    "test_name": test_name
+                }, f)
+
             # Rsync up
             logger.info("Syncing files to session...")
             session_controller.push(
@@ -771,16 +844,6 @@ def run_test_config(
             )
 
             _check_stop(stop_event)
-
-            results_json = test_config["run"].get("results", None)
-            if results_json is None:
-                results_json = "/tmp/release_test_out.json"
-
-            env_vars = {
-                "RAY_ADDRESS": os.environ.get("RAY_ADDRESS", "auto"),
-                "TEST_OUTPUT_JSON": results_json,
-                "IS_SMOKE_TEST": "1" if smoke_test else "0",
-            }
 
             # Optionally run preparation command
             prepare_command = test_config["run"].get("prepare")
@@ -815,49 +878,19 @@ def run_test_config(
                 stop_event=stop_event,
                 result_queue=result_queue,
                 env_vars=env_vars,
-                state_str="CMD_RUN"
+                state_str="CMD_RUN",
+                kick_off_only=kick_off_only
             )
 
-            logger.info(f"Command finished successfully.")
-            if results_json:
-                results = get_remote_json_content(
-                    temp_dir=temp_dir,
-                    session_name=session_name,
-                    remote_file=results_json,
+            if not kick_off_only:
+                _process_finished_command(
                     session_controller=session_controller,
-                )
+                    scd_id=scd_id)
             else:
-                results = {
-                    "passed": 1
-                }
-
-            logs = get_command_logs(
-                session_controller, scd_id, test_config.get("log_lines", 50)
-            )
-
-            saved_artifacts = pull_artifacts_and_store_in_cloud(
-                temp_dir=temp_dir,
-                logs=logs,  # Also save logs in cloud
-                session_name=session_name,
-                test_name=test_name,
-                artifacts=test_config.get("artifacts", {}),
-                session_controller=session_controller,
-            )
-
-            logger.info("Fetched results and stored on the cloud. Returning.")
-
-            result_queue.put(
-                State(
-                    "END",
-                    time.time(),
-                    {
-                        "status": "finished",
-                        "last_logs": logs,
-                        "results": results,
-                        "artifacts": saved_artifacts,
-                    },
+                result_queue.put(
+                    State("END", time.time(),
+                          {"status": "kickoff", "last_logs": ""})
                 )
-            )
 
         except Exception as e:
             logger.error(e, exc_info=True)
@@ -936,7 +969,7 @@ def run_test_config(
 
 def run_test(
     test_config_file: str, test_name: str, project_id: str, smoke_test: bool = False,
-    no_terminate: bool = False
+    no_terminate: bool = False, kick_off_only: bool = False, check_progress = False
 ):
     with open(test_config_file, "rt") as f:
         test_configs = yaml.load(f, Loader=yaml.FullLoader)
@@ -965,21 +998,28 @@ def run_test(
 
     result = run_test_config(
         local_dir, project_id, test_name, test_config, smoke_test=smoke_test,
-        no_terminate=no_terminate
+        no_terminate=no_terminate, kick_off_only=kick_off_only
     )
 
-    last_logs = result.get("last_logs", "No logs.")
-    report_result(
-        test_name=test_name,
-        status=result.get("status", "invalid"),
-        logs=last_logs,
-        results=result.get("results", {}),
-        artifacts=result.get("artifacts", {}),
-    )
+    if kick_off_only:
+        logger.info("Kicked off test. It's now up to the `--check` "
+                    "part of the script to track its process.")
+        return
+    else:
+        # `--check` or no kick off only
+        last_logs = result.get("last_logs", "No logs.")
 
-    if has_errored(result):
-        notify(test_config.get("owner", {}), result)
-        raise RuntimeError(last_logs)
+        report_result(
+            test_name=test_name,
+            status=result.get("status", "invalid"),
+            logs=last_logs,
+            results=result.get("results", {}),
+            artifacts=result.get("artifacts", {}),
+        )
+
+        if has_errored(result):
+            notify(test_config.get("owner", {}), result)
+            raise RuntimeError(last_logs)
 
     return
 
@@ -994,6 +1034,12 @@ if __name__ == "__main__":
                         help="URL to ray wheels")
     parser.add_argument(
         "--no-terminate", action="store_true", default=False, help="Don't terminate session after failure"
+    )
+    parser.add_argument(
+        "--kick-off-only", action="store_true", default=False, help="Kick off only (don't wait for command to finish)"
+    )
+    parser.add_argument(
+        "--check", action="store_true", default=False, help="Check (long running) status"
     )
     parser.add_argument(
         "--smoke-test", action="store_true", help="Finish quickly for testing"
@@ -1027,5 +1073,7 @@ if __name__ == "__main__":
         test_name=args.test_name,
         project_id=GLOBAL_CONFIG["ANYSCALE_PROJECT"],
         smoke_test=args.smoke_test,
-        no_terminate=args.no_terminate,
+        no_terminate=args.no_terminate or args.kick_off,
+        kick_off_only=args.kick_off,
+        check_progress=args.check,
     )
