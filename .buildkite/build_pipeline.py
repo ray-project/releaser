@@ -63,6 +63,19 @@ def build_pipeline(steps):
     FILTER_FILE = os.environ.get("FILTER_FILE", "")
     FILTER_TEST = os.environ.get("FILTER_TEST", "")
 
+    print(
+        f"Building pipeline \n"
+        f"Ray repo/branch to test:\n"
+        f" RAY_REPO   = {RAY_REPO}\n"
+        f" RAY_BRANCH = {RAY_BRANCH}\n\n"
+        f"Ray repo/branch containing the test configurations and scripts:"
+        f" RAY_TEST_REPO   = {RAY_TEST_REPO}\n"
+        f" RAY_TEST_BRANCH = {RAY_BRANCH}\n\n"
+        f"Filtering for these tests:\n"
+        f" FILTER_FILE = {FILTER_FILE}\n"
+        f" FILTER_TEST = {FILTER_TEST}\n\n"
+    )
+
     for test_file, test_names in steps.items():
         if FILTER_FILE and FILTER_FILE not in test_file:
             continue
@@ -71,6 +84,8 @@ def build_pipeline(steps):
         for test_name in test_names:
             if FILTER_TEST and FILTER_TEST not in test_name:
                 continue
+
+            print(f"Adding test: {test_base}/{test_name}")
 
             step_conf = copy.deepcopy(DEFAULT_STEP_TEMPLATE)
 
