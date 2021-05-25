@@ -56,6 +56,7 @@ def build_pipeline(steps):
 
     RAY_BRANCH = os.environ.get("RAY_BRANCH", "master")
     RAY_REPO = os.environ.get("RAY_REPO", "https://github.com/ray-project/ray.git")
+    RAY_TEST_BRANCH = os.environ.get("RAY_TEST_BRANCH", RAY_BRANCH)
 
     FILTER_FILE = os.environ.get("FILTER_FILE", "")
     FILTER_TEST = os.environ.get("FILTER_TEST", "")
@@ -80,11 +81,12 @@ def build_pipeline(steps):
             step_conf["commands"] = [
                 "pip install -q -r requirements.txt",
                 "pip install -U boto3 botocore",
-                f"git clone -b {RAY_BRANCH} {RAY_REPO} ~/ray",
+                f"git clone -b {RAY_TEST_BRANCH} {RAY_REPO} ~/ray",
                 cmd,
             ]
 
-            step_conf["label"] = f"({RAY_BRANCH}) {test_base}: {test_name}"
+            step_conf["label"] = f"({RAY_BRANCH}) " \
+                                 f"{RAY_TEST_BRANCH}{test_base}: {test_name}"
             all_steps.append(step_conf)
 
     return all_steps
