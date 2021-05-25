@@ -17,6 +17,12 @@ NIGHTLY_TESTS = {
         "ft_small_elastic",
         "ft_small_non_elastic",
         "distributed_api_test",
+    ],
+    "~/ray/release/nightly_tests/nightly_tests.yaml": [
+        "shuffle_10gb",
+        "shuffle_50gb",
+        "shuffle_50gb_large_partition",
+        "shuffle_100gb",
     ]
 }
 
@@ -51,9 +57,18 @@ def build_pipeline(steps):
     RAY_BRANCH = os.environ.get("RAY_BRANCH", "master")
     RAY_REPO = os.environ.get("RAY_REPO", "https://github.com/ray-project/ray.git")
 
+    FILTER_FILE = os.environ.get("FILTER_FILE", "")
+    FILTER_TEST = os.environ.get("FILTER_TEST", "")
+
     for test_file, test_names in steps.items():
+        if FILTER_FILE and FILTER_FILE not in test_file:
+            continue
+
         test_base = os.path.basename(test_file)
         for test_name in test_names:
+            if FILTER_TEST and FILTER_TEST not in test_name:
+                continue
+
             step_conf = copy.deepcopy(DEFAULT_STEP_TEMPLATE)
 
             cmd = str(f"python e2e.py "
