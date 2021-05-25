@@ -163,6 +163,7 @@ from typing import Any, Dict, Optional, Tuple, List
 import yaml
 
 import anyscale
+import anyscale.conf
 from anyscale.api import instantiate_api_client
 from anyscale.controllers.session_controller import SessionController
 from anyscale.sdk.anyscale_client.sdk import AnyscaleSDK
@@ -819,11 +820,16 @@ def run_test_config(
         "IS_SMOKE_TEST": "1" if smoke_test else "0",
     }
 
+    with open(os.path.join(local_dir, ".anyscale.yaml"), "wt") as f:
+        f.write(f"project_id: {project_id}")
+    os.chdir(local_dir)
+
     # Setup interface
     # Unfortunately, there currently seems to be no great way to
     # transfer files with the Anyscale SDK.
     # So we use the session controller instead.
     sdk = AnyscaleSDK(auth_token=GLOBAL_CONFIG["ANYSCALE_CLI_TOKEN"])
+
     session_controller = SessionController(
         api_client=instantiate_api_client(
             cli_token=GLOBAL_CONFIG["ANYSCALE_CLI_TOKEN"],
@@ -831,10 +837,6 @@ def run_test_config(
         ),
         anyscale_api_client=sdk.api_client,
     )
-
-    with open(os.path.join(local_dir, ".anyscale.yaml"), "wt") as f:
-        f.write(f"project_id: {project_id}")
-    os.chdir(local_dir)
 
     timeout = test_config["run"].get("timeout", 1800)
 
@@ -882,6 +884,8 @@ def run_test_config(
             ))
 
     def _run(logger):
+        anyscale.conf.CLI_TOKEN = GLOBAL_CONFIG["ANYSCALE_CLI_TOKEN"]
+
         session_id = None
         scd_id = None
         try:
@@ -1020,6 +1024,8 @@ def run_test_config(
                 _cleanup_session(sdk, session_id)
 
     def _check_progress(logger):
+        anyscale.conf.CLI_TOKEN = GLOBAL_CONFIG["ANYSCALE_CLI_TOKEN"]
+
         should_terminate = False
         session_id = None
         scd_id = None
