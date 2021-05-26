@@ -513,15 +513,20 @@ def wait_for_build_or_raise(sdk: AnyscaleSDK,
 
     # Fetch build
     build_id = None
+    last_status = None
     result = sdk.list_builds(app_config_id)
     for build in sorted(result.results, key=lambda b: b.created_at):
         build_id = build.id
+        last_status = build.status
 
         if build.status == "failed":
-            raise RuntimeError("App config build failed.")
+            continue
 
         if build.status == "succeeded":
             return build_id
+
+    if last_status == "failed":
+        raise RuntimeError("App config build failed.")
 
     if not build_id:
         raise RuntimeError("No build found for app config.")
