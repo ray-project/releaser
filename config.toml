@@ -12,11 +12,14 @@
 # ---------------------------------------------------
 # Regular job
 # ---------------------------------------------------
-[microbenchmark]
-base_dir = "release/microbenchmark"
-cluster_config = "cluster.yaml"
-exec_cmd = """unset RAY_ADDRESS && OMP_NUM_THREADS=64 ray microbenchmark"""
 
+
+# Removed
+#[microbenchmark]
+#base_dir = "release/microbenchmark"
+#cluster_config = "cluster.yaml"
+#exec_cmd = """unset RAY_ADDRESS && OMP_NUM_THREADS=64 ray microbenchmark"""
+#
 
 # ---------------------------------------------------
 # Release tests.
@@ -144,45 +147,45 @@ python scalability.py
 # ---------------------------------------------------
 # Tune tests.
 # ---------------------------------------------------
-[tune_scalability_tests]
-base_dir = "release/tune_tests/scalability_tests"
-cluster_config = "cluster_1x16.yaml"
-exec_cmd = """python ../../util/wait_cluster.py {{ctx["nodes"]}} 600 && python workloads/{{ctx["workload"]}}.py"""
-
-    [[tune_scalability_tests.case]]
-    cluster_config = "cluster_1x16.yaml"
-    nodes = 1
-    workload = "test_bookkeeping_overhead"
-
-    [[tune_scalability_tests.case]]
-    cluster_config = "cluster_16x64.yaml"
-    nodes = 16
-    workload = "test_result_throughput_cluster"
-
-    [[tune_scalability_tests.case]]
-    cluster_config = "cluster_1x96.yaml"
-    nodes = 1
-    workload = "test_result_throughput_single_node"
-
-    [[tune_scalability_tests.case]]
-    cluster_config = "cluster_200x2.yaml"
-    nodes = 200
-    workload = "test_network_overhead"
-
-    [[tune_scalability_tests.case]]
-    cluster_config = "cluster_1x32_hd.yaml"
-    nodes = 1
-    workload = "test_long_running_large_checkpoints"
-
-    [[tune_scalability_tests.case]]
-    cluster_config = "cluster_16x64_data.yaml"
-    nodes = 16
-    workload = "test_xgboost_sweep"
-
-    [[tune_scalability_tests.case]]
-    cluster_config = "cluster_16x2.yaml"
-    nodes = 16
-    workload = "test_durable_trainable"
+#[tune_scalability_tests]
+#base_dir = "release/tune_tests/scalability_tests"
+#cluster_config = "cluster_1x16.yaml"
+#exec_cmd = """python ../../util/wait_cluster.py {{ctx["nodes"]}} 600 && python workloads/{{ctx["workload"]}}.py"""
+#
+#    [[tune_scalability_tests.case]]
+#    cluster_config = "cluster_1x16.yaml"
+#    nodes = 1
+#    workload = "test_bookkeeping_overhead"
+#
+#    [[tune_scalability_tests.case]]
+#    cluster_config = "cluster_16x64.yaml"
+#    nodes = 16
+#    workload = "test_result_throughput_cluster"
+#
+#    [[tune_scalability_tests.case]]
+#    cluster_config = "cluster_1x96.yaml"
+#    nodes = 1
+#    workload = "test_result_throughput_single_node"
+#
+#    [[tune_scalability_tests.case]]
+#    cluster_config = "cluster_200x2.yaml"
+#    nodes = 200
+#    workload = "test_network_overhead"
+#
+#    [[tune_scalability_tests.case]]
+#    cluster_config = "cluster_1x32_hd.yaml"
+#    nodes = 1
+#    workload = "test_long_running_large_checkpoints"
+#
+#    [[tune_scalability_tests.case]]
+#    cluster_config = "cluster_16x64_data.yaml"
+#    nodes = 16
+#    workload = "test_xgboost_sweep"
+#
+#    [[tune_scalability_tests.case]]
+#    cluster_config = "cluster_16x2.yaml"
+#    nodes = 16
+#    workload = "test_durable_trainable"
 
 
 # ---------------------------------------------------
@@ -215,52 +218,52 @@ exec_cmd = """bash run.sh {{ctx["git_commit"]}}"""
 # ---------------------------------------------------
 # XGBoost tests.
 # ---------------------------------------------------
-[xgboost_tests]
-base_dir = "release/xgboost_tests"
-cluster_config = "cluster_cpu_small.yaml"
-exec_cmd = """python wait_cluster.py {{ctx["nodes"]}} 600 && python workloads/{{ctx["workload"]}}.py"""
-
-    [[xgboost_tests.case]]
-    cluster_config = "cluster_cpu_small.yaml"
-    nodes = 4
-    workload = "distributed_api_test"
-
-    [[xgboost_tests.case]]
-    cluster_config = "cluster_cpu_small.yaml"
-    nodes = 4
-    workload = "train_small"
-
-    [[xgboost_tests.case]]
-    cluster_config = "cluster_cpu_small.yaml"
-    nodes = 4
-    workload = "tune_small"
-
-    [[xgboost_tests.case]]
-    cluster_config = "cluster_cpu_small.yaml"
-    nodes = 4
-    workload = "ft_small_non_elastic"
-
-    [[xgboost_tests.case]]
-    cluster_config = "cluster_cpu_small.yaml"
-    nodes = 4
-    workload = "ft_small_elastic"
-
-    [[xgboost_tests.case]]
-    cluster_config = "cluster_cpu_moderate.yaml"
-    nodes = 32
-    workload = "train_moderate"
-
-    [[xgboost_tests.case]]
-    cluster_config = "cluster_cpu_moderate.yaml"
-    nodes = 32
-    workload = "tune_4x32"
-
-    [[xgboost_tests.case]]
-    cluster_config = "cluster_cpu_moderate.yaml"
-    nodes = 32
-    workload = "tune_32x4"
-
-    [[xgboost_tests.case]]
-    cluster_config = "cluster_gpu_small.yaml"
-    nodes = 5
-    workload = "train_gpu"
+#[xgboost_tests]
+#base_dir = "release/xgboost_tests"
+#cluster_config = "cluster_cpu_small.yaml"
+#exec_cmd = """python wait_cluster.py {{ctx["nodes"]}} 600 && python workloads/{{ctx["workload"]}}.py"""
+#
+#    [[xgboost_tests.case]]
+#    cluster_config = "cluster_cpu_small.yaml"
+#    nodes = 4
+#    workload = "distributed_api_test"
+#
+#    [[xgboost_tests.case]]
+#    cluster_config = "cluster_cpu_small.yaml"
+#    nodes = 4
+#    workload = "train_small"
+#
+#    [[xgboost_tests.case]]
+#    cluster_config = "cluster_cpu_small.yaml"
+#    nodes = 4
+#    workload = "tune_small"
+#
+#    [[xgboost_tests.case]]
+#    cluster_config = "cluster_cpu_small.yaml"
+#    nodes = 4
+#    workload = "ft_small_non_elastic"
+#
+#    [[xgboost_tests.case]]
+#    cluster_config = "cluster_cpu_small.yaml"
+#    nodes = 4
+#    workload = "ft_small_elastic"
+#
+#    [[xgboost_tests.case]]
+#    cluster_config = "cluster_cpu_moderate.yaml"
+#    nodes = 32
+#    workload = "train_moderate"
+#
+#    [[xgboost_tests.case]]
+#    cluster_config = "cluster_cpu_moderate.yaml"
+#    nodes = 32
+#    workload = "tune_4x32"
+#
+#    [[xgboost_tests.case]]
+#    cluster_config = "cluster_cpu_moderate.yaml"
+#    nodes = 32
+#    workload = "tune_32x4"
+#
+#    [[xgboost_tests.case]]
+#    cluster_config = "cluster_gpu_small.yaml"
+#    nodes = 5
+#    workload = "train_gpu"

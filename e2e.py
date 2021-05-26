@@ -321,7 +321,7 @@ def has_errored(result: Dict[Any, Any]) -> bool:
     return result.get("status", "invalid") != "finished"
 
 
-def report_result(test_name: str, status: str, logs: str,
+def report_result(test_suite:str, test_name: str, status: str, logs: str,
                   results: Dict[Any, Any], artifacts: Dict[Any, Any],
                   category: str):
     now = datetime.datetime.utcnow()
@@ -331,7 +331,7 @@ def report_result(test_name: str, status: str, logs: str,
 
     sql = (
         f"INSERT INTO {schema} "
-        f"(created_on, test_name, status, last_logs, results, artifacts, category) "
+        f"(created_on, test_suite, test_name, status, last_logs, results, artifacts, category) "
         f"VALUES (:created_on, :test_name, :status, :last_logs, :results, :artifacts, :category)"
     )
 
@@ -344,6 +344,12 @@ def report_result(test_name: str, status: str, logs: str,
                 "value": {
                     "stringValue": now.strftime("%Y-%m-%d %H:%M:%S")
                 },
+            },
+            {
+                "name": "test_suite",
+                "value": {
+                    "stringValue": test_suite
+                }
             },
             {
                 "name": "test_name",
@@ -1261,7 +1267,10 @@ def run_test(test_config_file: str,
 
         last_logs = result.get("last_logs", "No logs.")
 
+        test_suite = os.path.basename(test_config_file)
+
         report_result(
+            test_suite=test_suite,
             test_name=test_name,
             status=status,
             logs=last_logs,
