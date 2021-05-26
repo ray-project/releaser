@@ -1,7 +1,9 @@
 import copy
+import logging
 import os
 import sys
 import yaml
+
 
 NIGHTLY_TESTS = {
     "~/ray/release/microbenchmark/microbenchmark.yaml": [
@@ -80,7 +82,7 @@ def build_pipeline(steps):
     FILTER_FILE = os.environ.get("FILTER_FILE", "")
     FILTER_TEST = os.environ.get("FILTER_TEST", "")
 
-    print(
+    logging.info(
         f"Building pipeline \n"
         f"Ray repo/branch to test:\n"
         f" RAY_REPO   = {RAY_REPO}\n"
@@ -102,7 +104,7 @@ def build_pipeline(steps):
             if FILTER_TEST and FILTER_TEST not in test_name:
                 continue
 
-            print(f"Adding test: {test_base}/{test_name}")
+            logging.info(f"Adding test: {test_base}/{test_name}")
 
             step_conf = copy.deepcopy(DEFAULT_STEP_TEMPLATE)
 
