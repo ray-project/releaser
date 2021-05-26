@@ -436,12 +436,22 @@ def create_or_find_compute_template(
                     f"with hash {compute_tpl_hash}. Looking up existing "
                     f"templates.")
 
-        result = sdk.search_compute_templates(dict(project_id=project_id))
-        for res in result.results:
-            if res.name == compute_tpl_hash:
-                compute_tpl_id = res.id
-                logger.info(
-                    f"Template already exists with ID {compute_tpl_id}")
+        paging_token = None
+        while not compute_tpl_id:
+            result = sdk.search_compute_templates(dict(
+                project_id=project_id, paging_token=paging_token))
+            paging_token = result.metadata.next_paging_token
+
+            for res in result.results:
+                if res.name == compute_tpl_hash:
+                    compute_tpl_id = res.id
+                    logger.info(
+                        f"Template already exists with ID {compute_tpl_id}")
+                    break
+
+            if not paging_token:
+                if not compute_tpl_id:
+                    logger.info("Compute template not found. Creating new one.")
                 break
 
         if not compute_tpl_id:
