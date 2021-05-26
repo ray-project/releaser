@@ -1339,8 +1339,10 @@ if __name__ == "__main__":
             raise RuntimeError(
                 f"Could not find wheels for Ray {version}, branch {branch}")
 
+    test_config_file = os.path.abspath(os.path.expanduser(args.test_config))
+
     run_test(
-        test_config_file=args.test_config,
+        test_config_file=test_config_file,
         test_name=args.test_name,
         project_id=GLOBAL_CONFIG["ANYSCALE_PROJECT"],
         category=args.category,
