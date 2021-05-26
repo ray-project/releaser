@@ -332,7 +332,7 @@ def report_result(test_suite:str, test_name: str, status: str, logs: str,
     sql = (
         f"INSERT INTO {schema} "
         f"(created_on, test_suite, test_name, status, last_logs, results, artifacts, category) "
-        f"VALUES (:created_on, :test_name, :status, :last_logs, :results, :artifacts, :category)"
+        f"VALUES (:created_on, :test_suite, :test_name, :status, :last_logs, :results, :artifacts, :category)"
     )
 
     rds_data_client.execute_statement(
