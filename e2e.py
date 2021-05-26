@@ -439,7 +439,7 @@ def create_or_find_compute_template(
         paging_token = None
         while not compute_tpl_id:
             result = sdk.search_compute_templates(dict(
-                project_id=project_id, paging_token=paging_token))
+                project_id=project_id), paging_token=paging_token)
             paging_token = result.metadata.next_paging_token
 
             for res in result.results:
