@@ -26,6 +26,23 @@ NIGHTLY_TESTS = {
     ]
 }
 
+MANUAL_TESTS = {
+    "~/ray/release/tune_tests/scalability_tests/tune_tests.yaml": [
+        "bookkeeping_overhead",
+        "durable_trainable",
+        "long_running_large_checkpoints",
+        "network_overhead",
+        "result_throughput_cluster",
+        "result_throughput_single_node",
+        "xgboost_sweep",
+    ],
+}
+
+SUITES = {
+    "nightly": NIGHTLY_TESTS,
+    "manual": MANUAL_TESTS,
+}
+
 DEFAULT_STEP_TEMPLATE = {
     "env": {
         "ANYSCALE_CLOUD_ID": "cld_4F7k8814aZzGG8TNUGPKnc",
@@ -110,6 +127,9 @@ def build_pipeline(steps):
 
 
 if __name__ == "__main__":
-    steps = build_pipeline(NIGHTLY_TESTS)
+    TEST_SUITE = os.environ.get("RELEASE_TEST_SUITE", "nightly")
+    PIPELINE_SPEC = SUITES[TEST_SUITE]
+
+    steps = build_pipeline(PIPELINE_SPEC)
 
     yaml.dump({"steps": steps}, sys.stdout)
