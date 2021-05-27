@@ -4,7 +4,6 @@ import os
 import sys
 import yaml
 
-
 NIGHTLY_TESTS = {
     "~/ray/release/microbenchmark/microbenchmark.yaml": [
         "microbenchmark",
@@ -58,14 +57,12 @@ DEFAULT_STEP_TEMPLATE = {
     "agents": {
         "queue": "runner_queue_branch"
     },
-    "plugins": [
-        {
-            "docker#v3.8.0": {
-                "image": "rayproject/ray",
-                "propagate-environment": True
-            }
+    "plugins": [{
+        "docker#v3.8.0": {
+            "image": "rayproject/ray",
+            "propagate-environment": True
         }
-    ],
+    }],
     "commands": []
 }
 
@@ -74,7 +71,8 @@ def build_pipeline(steps):
     all_steps = []
 
     RAY_BRANCH = os.environ.get("RAY_BRANCH", "master")
-    RAY_REPO = os.environ.get("RAY_REPO", "https://github.com/ray-project/ray.git")
+    RAY_REPO = os.environ.get("RAY_REPO",
+                              "https://github.com/ray-project/ray.git")
 
     RAY_TEST_BRANCH = os.environ.get("RAY_TEST_BRANCH", RAY_BRANCH)
     RAY_TEST_REPO = os.environ.get("RAY_TEST_REPO", RAY_REPO)
@@ -92,8 +90,7 @@ def build_pipeline(steps):
         f" RAY_TEST_BRANCH = {RAY_BRANCH}\n\n"
         f"Filtering for these tests:\n"
         f" FILTER_FILE = {FILTER_FILE}\n"
-        f" FILTER_TEST = {FILTER_TEST}\n\n"
-    )
+        f" FILTER_TEST = {FILTER_TEST}\n\n")
 
     for test_file, test_names in steps.items():
         if FILTER_FILE and FILTER_FILE not in test_file:

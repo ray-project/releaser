@@ -321,7 +321,7 @@ def has_errored(result: Dict[Any, Any]) -> bool:
     return result.get("status", "invalid") != "finished"
 
 
-def report_result(test_suite:str, test_name: str, status: str, logs: str,
+def report_result(test_suite: str, test_name: str, status: str, logs: str,
                   results: Dict[Any, Any], artifacts: Dict[Any, Any],
                   category: str):
     now = datetime.datetime.utcnow()
@@ -438,8 +438,12 @@ def create_or_find_compute_template(
 
         paging_token = None
         while not compute_tpl_id:
-            result = sdk.search_compute_templates(dict(
-                project_id=project_id), paging_token=paging_token)
+            result = sdk.search_compute_templates(
+                dict(
+                    project_id=project_id,
+                    name=dict(equals=compute_tpl_hash),
+                    include_anonymous=True),
+                paging_token=paging_token)
             paging_token = result.metadata.next_paging_token
 
             for res in result.results:
@@ -451,7 +455,8 @@ def create_or_find_compute_template(
 
             if not paging_token:
                 if not compute_tpl_id:
-                    logger.info("Compute template not found. Creating new one.")
+                    logger.info(
+                        "Compute template not found. Creating new one.")
                 break
 
         if not compute_tpl_id:
