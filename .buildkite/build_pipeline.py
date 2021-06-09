@@ -24,6 +24,9 @@ NIGHTLY_TESTS = {
         "shuffle_50gb",
         "shuffle_50gb_large_partition",
         "shuffle_100gb",
+        "non_streaming_shuffle_100gb",
+        "non_streaming_shuffle_50gb_large_partition",
+        "non_streaming_shuffle_50gb",
     ]
 }
 
