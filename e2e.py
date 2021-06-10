@@ -1172,7 +1172,7 @@ def run_test_config(
         process = multiprocessing.Process(
             target=_check_progress, args=(logger, ))
 
-    build_timeout = test_config["run"].get("build_timeout", 1200)
+    build_timeout = test_config["run"].get("build_timeout", 1800)
 
     logger.info(f"Starting process with timeout {timeout} "
                 f"(build timeout {build_timeout})")
