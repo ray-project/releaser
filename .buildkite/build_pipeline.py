@@ -95,7 +95,7 @@ def build_pipeline(steps):
         f" RAY_BRANCH = {RAY_BRANCH}\n\n"
         f"Ray repo/branch containing the test configurations and scripts:"
         f" RAY_TEST_REPO   = {RAY_TEST_REPO}\n"
-        f" RAY_TEST_BRANCH = {RAY_BRANCH}\n\n"
+        f" RAY_TEST_BRANCH = {RAY_TEST_BRANCH}\n\n"
         f"Filtering for these tests:\n"
         f" FILTER_FILE = {FILTER_FILE}\n"
         f" FILTER_TEST = {FILTER_TEST}\n\n")
