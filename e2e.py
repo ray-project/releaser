@@ -1287,7 +1287,7 @@ def run_test(test_config_file: str,
 
         last_logs = result.get("last_logs", "No logs.")
 
-        test_suite = os.path.basename(test_config_file)
+        test_suite = os.path.basename(test_config_file).replace(".yaml", "")
 
         report_result(
             test_suite=test_suite,
