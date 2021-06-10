@@ -19,6 +19,13 @@ NIGHTLY_TESTS = {
         "ft_small_non_elastic",
         "distributed_api_test",
     ],
+    "~/ray/release/tune_tests/scalability_tests/tune_tests.yaml": [
+        "bookkeeping_overhead",
+        "network_overhead",
+        "result_throughput_cluster",
+        "result_throughput_single_node",
+        "xgboost_sweep",
+    ],
     "~/ray/release/nightly_tests/nightly_tests.yaml": [
         "shuffle_10gb",
         "shuffle_50gb",
@@ -30,18 +37,13 @@ NIGHTLY_TESTS = {
         "dask_on_ray_10gb_sort",
         "shuffle_1tb_large_partition",
         "dask_on_ray_large_scale_test_no_spilling"
-    ]
+    ],
 }
 
 MANUAL_TESTS = {
     "~/ray/release/tune_tests/scalability_tests/tune_tests.yaml": [
-        "bookkeeping_overhead",
         "durable_trainable",
         "long_running_large_checkpoints",
-        "network_overhead",
-        "result_throughput_cluster",
-        "result_throughput_single_node",
-        "xgboost_sweep",
     ],
 }
 

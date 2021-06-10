@@ -1173,12 +1173,15 @@ def run_test_config(
         process = multiprocessing.Process(
             target=_check_progress, args=(logger, ))
 
-    logger.info(f"Starting process with timeout {timeout}")
+    build_timeout = test_config["run"].get("build_timeout", 1200)
+
+    logger.info(f"Starting process with timeout {timeout} "
+                f"(build timeout {build_timeout})")
     process.start()
 
-    # This is a timeout for the full run
-    # Should we add a specific build timeout here?
-    timeout_time = time.time() + timeout
+    # The timeout time will be updated after the build finished
+    # Build = App config + compute template build and session start
+    timeout_time = time.time() + build_timeout
 
     result = {}
     while process.is_alive():
@@ -1197,8 +1200,12 @@ def run_test_config(
         if not isinstance(state, State):
             raise RuntimeError(f"Expected `State` object, got {result}")
 
-        if state.state == "CMD_RUN":
+        if state.state == "CMD_PREPARE":
             # Reset timeout after build finished
+            timeout_time = state.timestamp + timeout
+
+        if state.state == "CMD_RUN":
+            # Reset timeout after prepare command or build finished
             timeout_time = state.timestamp + timeout
 
         elif state.state == "END":
