@@ -27,6 +27,9 @@ NIGHTLY_TESTS = {
         "non_streaming_shuffle_100gb",
         "non_streaming_shuffle_50gb_large_partition",
         "non_streaming_shuffle_50gb",
+        "dask_on_ray_10gb_sort",
+        "shuffle_1tb_large_partition",
+        "dask_on_ray_large_scale_test_no_spilling"
     ]
 }
 
