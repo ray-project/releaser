@@ -494,12 +494,11 @@ def create_or_find_app_config(sdk: AnyscaleSDK, project_id: str,
                         f"App config already exists with ID {app_config_id}")
                     break
 
-            if not paging_token:
-                if not app_config_id:
-                    logger.info("App config not found. Creating new one.")
+            if not paging_token or app_config_id:
                 break
 
         if not app_config_id:
+            logger.info("App config not found. Creating new one.")
             result = sdk.create_app_config(
                 dict(
                     name=app_config_hash,
