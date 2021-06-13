@@ -38,6 +38,9 @@ NIGHTLY_TESTS = {
         "shuffle_1tb_large_partition",
         "dask_on_ray_large_scale_test_no_spilling"
     ],
+    "~/ray/release/nightly_gpu_tests/nightly_gpu_tests.yaml": [
+        "sgd_gpu",
+    ],
 }
 
 MANUAL_TESTS = {
