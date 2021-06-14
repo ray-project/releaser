@@ -446,7 +446,7 @@ def search_running_session(sdk: AnyscaleSDK, project_id: str,
 
 def create_or_find_compute_template(
         sdk: AnyscaleSDK, project_id: str,
-        compute_tpl: Dict[Any, Any]) -> Optional[str]:
+        compute_tpl: Dict[Any, Any]) -> Tuple[Optional[str], Optional[str]]:
     compute_tpl_id = None
     compute_tpl_name = None
     if compute_tpl:
@@ -496,8 +496,9 @@ def create_or_find_app_config(sdk: AnyscaleSDK, project_id: str,
                               app_config: Dict[Any, Any]) -> Tuple[
         Optional[str], Optional[str]]:
     app_config_id = None
+    app_config_name = None
     if app_config:
-        app_config_name = _dict_hash(app_config)
+        app_config_name = f"{project_id}__{_dict_hash(app_config)}"
 
         logger.info(f"Test uses an app config with hash {app_config_name}. "
                     f"Looking up existing app configs with this name.")
