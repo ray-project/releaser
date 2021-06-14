@@ -598,7 +598,7 @@ def run_job(cluster_name: str, compute_tpl_name: str, cluster_env_name: str,
     env = copy.deepcopy(os.environ)
     env["RAY_ADDRESS"] = address
     env["RAY_JOB_NAME"] = job_name
-    return subprocess.run(["python", script] + script_args, env=env)
+    return subprocess.run(script.split(" ") + script_args, env=env)
 
 
 def create_and_wait_for_session(
