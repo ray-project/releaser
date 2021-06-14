@@ -81,7 +81,8 @@ only want to trigger rebuilds once per day, use `DATESTAMP` instead:
 Local testing
 -------------
 For local testing, make sure to authenticate with the ray-ossci AWS user
-(e.g. by setting the respective environment variables obtained from go/aws).
+(e.g. by setting the respective environment variables obtained from go/aws),
+or use the `--no-report` command line argument.
 
 Also make sure to set these environment variables:
 
@@ -90,7 +91,10 @@ Also make sure to set these environment variables:
 
 A test can then be run like this:
 
-python e2e.py --test-config ~/ray/release/xgboost_tests/xgboost_tests.yaml --test-name tune_small
+python e2e.py --no-report --test-config ~/ray/release/xgboost_tests/xgboost_tests.yaml --test-name tune_small
+
+The `--no-report` option disables storing the results in the DB and artifacts on S3.
+If you set this option, you do not need access to the ray-ossci AWS user.
 
 Long running tests
 ------------------
@@ -218,11 +222,14 @@ GLOBAL_CONFIG = {
 
 REPORT_S = 30
 
-if GLOBAL_CONFIG["ANYSCALE_CLI_TOKEN"] is None:
-    print("Missing ANYSCALE_CLI_TOKEN, retrieving from AWS secrets store")
-    # NOTE(simon) This should automatically retrieve release-automation@anyscale.com's anyscale token
-    GLOBAL_CONFIG["ANYSCALE_CLI_TOKEN"] = boto3.client(
-        "secretsmanager", region_name="us-west-2").get_secret_value(
+
+def maybe_fetch_api_token():
+    if GLOBAL_CONFIG["ANYSCALE_CLI_TOKEN"] is None:
+        print("Missing ANYSCALE_CLI_TOKEN, retrieving from AWS secrets store")
+        # NOTE(simon) This should automatically retrieve release-automation@anyscale.com's anyscale token
+        GLOBAL_CONFIG["ANYSCALE_CLI_TOKEN"] = boto3.client(
+            "secretsmanager", region_name="us-west-2"
+        ).get_secret_value(
             SecretId="arn:aws:secretsmanager:us-west-2:029272617770:secret:"
             "release-automation/"
             "anyscale-token20210505220406333800000001-BcUuKB")["SecretString"]
@@ -799,6 +806,7 @@ def run_test_config(
         no_terminate: bool = False,
         kick_off_only: bool = False,
         check_progress: bool = False,
+        upload_artifacts: bool = True,
 ) -> Dict[Any, Any]:
     """
 
@@ -885,16 +893,21 @@ def run_test_config(
         else:
             logs = "No command found to fetch logs for"
 
-        saved_artifacts = pull_artifacts_and_store_in_cloud(
-            temp_dir=temp_dir,
-            logs=logs,  # Also save logs in cloud
-            session_name=session_name,
-            test_name=test_name,
-            artifacts=test_config.get("artifacts", {}),
-            session_controller=session_controller,
-        )
+        if upload_artifacts:
+            saved_artifacts = pull_artifacts_and_store_in_cloud(
+                temp_dir=temp_dir,
+                logs=logs,  # Also save logs in cloud
+                session_name=session_name,
+                test_name=test_name,
+                artifacts=test_config.get("artifacts", {}),
+                session_controller=session_controller,
+            )
 
-        logger.info("Fetched results and stored on the cloud. Returning.")
+            logger.info("Fetched results and stored on the cloud. Returning.")
+        else:
+            saved_artifacts = {}
+            logger.info("Usually I would have fetched the results and "
+                        "artifacts and stored them on S3.")
 
         result_queue.put(
             State(
@@ -1235,7 +1248,8 @@ def run_test(test_config_file: str,
              smoke_test: bool = False,
              no_terminate: bool = False,
              kick_off_only: bool = False,
-             check_progress=False):
+             check_progress=False,
+             report=True):
     with open(test_config_file, "rt") as f:
         test_configs = yaml.load(f, Loader=yaml.FullLoader)
 
@@ -1268,7 +1282,8 @@ def run_test(test_config_file: str,
         smoke_test=smoke_test,
         no_terminate=no_terminate,
         kick_off_only=kick_off_only,
-        check_progress=check_progress)
+        check_progress=check_progress,
+        upload_artifacts=report)
 
     status = result.get("status", "invalid")
 
@@ -1295,7 +1310,7 @@ def run_test(test_config_file: str,
 
         test_suite = os.path.basename(test_config_file).replace(".yaml", "")
 
-        report_result(
+        report_kwargs = dict(
             test_suite=test_suite,
             test_name=test_name,
             status=status,
@@ -1304,6 +1319,12 @@ def run_test(test_config_file: str,
             artifacts=result.get("artifacts", {}),
             category=category,
         )
+
+        if report:
+            report_result(**report_kwargs)
+        else:
+            logger.info(f"Usually I would now report the following results:\n"
+                        f"{report_kwargs}")
 
         if has_errored(result):
             notify(test_config.get("owner", {}), result)
@@ -1325,6 +1346,11 @@ if __name__ == "__main__":
         default=False,
         help="Don't terminate session after failure")
     parser.add_argument(
+        "--no-report",
+        action="store_true",
+        default=False,
+        help="Do not report any results or upload to S3")
+    parser.add_argument(
         "--kick-off-only",
         action="store_true",
         default=False,
@@ -1342,6 +1368,8 @@ if __name__ == "__main__":
     parser.add_argument(
         "--smoke-test", action="store_true", help="Finish quickly for testing")
     args, _ = parser.parse_known_args()
+
+    maybe_fetch_api_token()
 
     if args.ray_wheels:
         os.environ["RAY_WHEELS"] = str(args.ray_wheels)
@@ -1376,4 +1404,5 @@ if __name__ == "__main__":
         no_terminate=args.no_terminate or args.kick_off_only,
         kick_off_only=args.kick_off_only,
         check_progress=args.check,
+        report=not args.no_report,
     )
