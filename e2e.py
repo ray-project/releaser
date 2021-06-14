@@ -92,6 +92,18 @@ A test can then be run like this:
 
 python e2e.py --test-config ~/ray/release/xgboost_tests/xgboost_tests.yaml --test-name tune_small
 
+Running on Head Node vs Running with Anyscale Connect
+-----------------------------------------------------
+By default release tests run their drivers on the head node. Support is being
+added to run release tests that execute the driver as a subprocess and run
+the workload on Anyscale product via Anyscale connect.
+Note that when the driver in the test is a subprocess of releaser, releaser
+cannot be terminated before the test finishes.
+Other known feature gaps when running with Anyscale connect:
+- Kicking off a test or checking progress is not supported.
+- Downloading / uploading logs and artifacts are unsupported.
+- Logs from remote may not have finished streaming, before the driver exits.
+
 Long running tests
 ------------------
 Long running tests can be kicked off with by adding the --kick-off-only parameter
@@ -429,11 +441,14 @@ def create_or_find_compute_template(
         sdk: AnyscaleSDK, project_id: str,
         compute_tpl: Dict[Any, Any]) -> Optional[str]:
     compute_tpl_id = None
+    compute_tpl_name = None
     if compute_tpl:
-        compute_tpl_hash = _dict_hash(compute_tpl)
+        # As of Anyscale 0.4.1, it is an error to use the same compute template
+        # name within the same organization, between different projects.
+        compute_tpl_name = f"{project_id}/compute/{_dict_hash(compute_tpl)}"
 
         logger.info(f"Tests uses compute template "
-                    f"with hash {compute_tpl_hash}. Looking up existing "
+                    f"with name {compute_tpl_name}. Looking up existing "
                     f"templates.")
 
         paging_token = None
@@ -441,45 +456,44 @@ def create_or_find_compute_template(
             result = sdk.search_compute_templates(
                 dict(
                     project_id=project_id,
-                    name=dict(equals=compute_tpl_hash),
+                    name=dict(equals=compute_tpl_name),
                     include_anonymous=True),
                 paging_token=paging_token)
             paging_token = result.metadata.next_paging_token
 
             for res in result.results:
-                if res.name == compute_tpl_hash:
+                if res.name == compute_tpl_name:
                     compute_tpl_id = res.id
                     logger.info(
                         f"Template already exists with ID {compute_tpl_id}")
                     break
 
             if not paging_token:
-                if not compute_tpl_id:
-                    logger.info(
-                        "Compute template not found. Creating new one.")
                 break
 
         if not compute_tpl_id:
+            logger.info(f"Compute template not found. "
+                        f"Creating with name {compute_tpl_name}.")
             result = sdk.create_compute_template(
                 dict(
-                    name=compute_tpl_hash,
+                    name=compute_tpl_name,
                     project_id=project_id,
                     config=compute_tpl))
             compute_tpl_id = result.result.id
-            logger.info(f"Template created with ID {compute_tpl_id}")
+            logger.info(f"Compute template created with ID {compute_tpl_id}")
 
-    return compute_tpl_id
+    return compute_tpl_id, compute_tpl_name
 
 
 def create_or_find_app_config(sdk: AnyscaleSDK, project_id: str,
-                              app_config: Dict[Any, Any]) -> Optional[str]:
+                              app_config: Dict[Any, Any]) -> Tuple[
+        Optional[str], Optional[str]]:
     app_config_id = None
     if app_config:
-        app_config_hash = _dict_hash(app_config)
+        app_config_name = _dict_hash(app_config)
 
-        logger.info(f"Tests uses app config "
-                    f"with hash {app_config_hash}. Looking up existing "
-                    f"app configs.")
+        logger.info(f"Test uses an app config with hash {app_config_name}. "
+                    f"Looking up existing app configs with this name.")
 
         paging_token = None
         while not app_config_id:
@@ -488,7 +502,7 @@ def create_or_find_app_config(sdk: AnyscaleSDK, project_id: str,
             paging_token = result.metadata.next_paging_token
 
             for res in result.results:
-                if res.name == app_config_hash:
+                if res.name == app_config_name:
                     app_config_id = res.id
                     logger.info(
                         f"App config already exists with ID {app_config_id}")
@@ -501,13 +515,13 @@ def create_or_find_app_config(sdk: AnyscaleSDK, project_id: str,
             logger.info("App config not found. Creating new one.")
             result = sdk.create_app_config(
                 dict(
-                    name=app_config_hash,
+                    name=app_config_name,
                     project_id=project_id,
                     config_json=app_config))
             app_config_id = result.result.id
             logger.info(f"App config created with ID {app_config_id}")
 
-    return app_config_id
+    return app_config_id, app_config_name
 
 
 def wait_for_build_or_raise(sdk: AnyscaleSDK,
@@ -566,13 +580,25 @@ def wait_for_build_or_raise(sdk: AnyscaleSDK,
     return build_id
 
 
+def run_job(cluster_name: str, compute_tpl_name: str, cluster_env_name: str,
+            job_name: str, script: str,
+            script_args: List[str]) -> subprocess.CompletedProcess:
+    # Start cluster and job
+    address = f"anyscale://{cluster_name}?cluster_compute={compute_tpl_name}" \
+              f"&cluster_env={cluster_env_name}"
+    logger.info(f"Starting job {job_name} with Ray address: {address}")
+    env = copy.deepcopy(os.environ)
+    env["RAY_ADDRESS"] = address
+    env["RAY_JOB_NAME"] = job_name
+    return subprocess.run(["python", script] + script_args, env=env)
+
+
 def create_and_wait_for_session(
         sdk: AnyscaleSDK,
         stop_event: multiprocessing.Event,
         session_name: str,
         session_options: Dict[Any, Any],
 ) -> str:
-
     # Create session
     logger.info(f"Creating session {session_name}")
     result = sdk.create_session(session_options)
@@ -908,6 +934,38 @@ def run_test_config(
                 },
             ))
 
+    # When running the test script in client mode, the finish command is a
+    # completed local process.
+    def _process_finished_client_command(proc: subprocess.CompletedProcess):
+        # TODO: include logs from local driver.
+        logs = f"stdout:\n{proc.stdout}\n\nstderr:\n{proc.stderr}\n"
+        saved_artifacts = pull_artifacts_and_store_in_cloud(
+            temp_dir=temp_dir,
+            logs=logs,  # Also save logs in cloud
+            session_name=session_name,
+            test_name=test_name,
+            artifacts=None,
+            session_controller=None,
+        )
+        logger.info("Stored results on the cloud. Returning.")
+
+        results = {
+            "passed": proc.returncode == 0,
+            "returncode": proc.returncode,
+        }
+
+        result_queue.put(
+            State(
+                "END",
+                time.time(),
+                {
+                    "status": "finished",
+                    "last_logs": logs,
+                    "results": results,
+                    "artifacts": saved_artifacts,
+                },
+            ))
+
     def _run(logger):
         anyscale.conf.CLI_TOKEN = GLOBAL_CONFIG["ANYSCALE_CLI_TOKEN"]
 
@@ -916,6 +974,8 @@ def run_test_config(
         try:
             # First, look for running sessions
             session_id = search_running_session(sdk, project_id, session_name)
+            compute_tpl_name = None
+            app_config_name = None
             if not session_id:
                 logger.info("No session found.")
                 # Start session
@@ -933,11 +993,11 @@ def run_test_config(
                     logging.info("Starting session with app/compute config")
 
                     # Find/create compute template
-                    compute_tpl_id = create_or_find_compute_template(
+                    compute_tpl_id, compute_tpl_name = create_or_find_compute_template(
                         sdk, project_id, compute_tpl)
 
                     # Find/create app config
-                    app_config_id = create_or_find_app_config(
+                    app_config_id, app_config_name = create_or_find_app_config(
                         sdk, project_id, app_config)
                     build_id = wait_for_build_or_raise(sdk, app_config_id)
 
@@ -945,12 +1005,30 @@ def run_test_config(
                     session_options["build_id"] = build_id
                     session_options["uses_app_config"] = True
 
-                session_id = create_and_wait_for_session(
-                    sdk=sdk,
-                    stop_event=stop_event,
-                    session_name=session_name,
-                    session_options=session_options,
-                )
+                if not test_config["run"].get("use_connect"):
+                    session_id = create_and_wait_for_session(
+                        sdk=sdk,
+                        stop_event=stop_event,
+                        session_name=session_name,
+                        session_options=session_options,
+                    )
+
+            if test_config["run"].get("use_connect"):
+                assert not kick_off_only, \
+                    "Unsupported for running with Anyscale connect."
+                assert compute_tpl_name, "Compute template must exist."
+                assert app_config_name, "Cluster environment must exist."
+                script_args = test_config["run"].get("args", [])
+                if smoke_test:
+                    script_args += ["--smoke-test"]
+                proc = run_job(cluster_name=test_name,
+                               compute_tpl_name=compute_tpl_name,
+                               cluster_env_name=app_config_name,
+                               job_name=session_name,
+                               script=test_config["run"]["script"],
+                               script_args=script_args)
+                _process_finished_client_command(proc)
+                return
 
             # Write test state json
             test_state_file = os.path.join(local_dir, "test_state.json")
@@ -1217,7 +1295,7 @@ def run_test_config(
 
     logger.info("Final check if everything worked.")
     try:
-        result.setdefault("status", "error")
+        result.setdefault("status", "error (status not found)")
     except (TimeoutError, Empty):
         result = {"status": "timeout", "last_logs": "Test timed out."}
 
@@ -1259,6 +1337,16 @@ def run_test(test_config_file: str,
     if "local_dir" in test_config:
         # local_dir is relative to test_config_file
         local_dir = os.path.join(local_dir, test_config["local_dir"])
+
+    if test_config["run"].get("use_connect"):
+        assert not kick_off_only, \
+            "--kick-off-only is unsupported when running with Anyscale connect."
+        assert not check_progress, \
+            "--check is unsupported when running with Anyscale connect."
+        if test_config.get("artifacts", {}):
+            logger.error(
+                "Saving artifacts are not yet supported when running with "
+                "Anyscale connect.")
 
     result = run_test_config(
         local_dir,
