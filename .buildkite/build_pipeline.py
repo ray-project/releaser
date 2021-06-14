@@ -35,8 +35,13 @@ NIGHTLY_TESTS = {
         "non_streaming_shuffle_50gb_large_partition",
         "non_streaming_shuffle_50gb",
         "dask_on_ray_10gb_sort",
+        "dask_on_ray_100gb_sort",
         "shuffle_1tb_large_partition",
-        "dask_on_ray_large_scale_test_no_spilling"
+        "dask_on_ray_large_scale_test_no_spilling",
+        "dask_on_ray_large_scale_test_spilling"
+    ],
+    "~/ray/release/nightly_gpu_tests/nightly_gpu_tests.yaml": [
+        "sgd_gpu",
     ],
 }
 
