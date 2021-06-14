@@ -166,6 +166,7 @@ import anyscale
 import anyscale.conf
 from anyscale.api import instantiate_api_client
 from anyscale.controllers.session_controller import SessionController
+from anyscale.sdk.anyscale_client.exceptions import ApiException
 from anyscale.sdk.anyscale_client.sdk import AnyscaleSDK
 
 logger = logging.getLogger()
@@ -460,13 +461,18 @@ def create_or_find_compute_template(
                 break
 
         if not compute_tpl_id:
-            result = sdk.create_compute_template(
-                dict(
-                    name=compute_tpl_hash,
-                    project_id=project_id,
-                    config=compute_tpl))
-            compute_tpl_id = result.result.id
-            logger.info(f"Template created with ID {compute_tpl_id}")
+            try:
+                result = sdk.create_compute_template(
+                    dict(
+                        name=compute_tpl_hash,
+                        project_id=project_id,
+                        config=compute_tpl))
+                compute_tpl_id = result.result.id
+                logger.info(f"Template created with ID {compute_tpl_id}")
+            except ApiException as e:
+                logger.exception(f"Exception creating template: {e}")
+                logger.info("Continuing execution - maybe the template "
+                            "already exists?")
 
     return compute_tpl_id
 
@@ -499,13 +505,18 @@ def create_or_find_app_config(sdk: AnyscaleSDK, project_id: str,
 
         if not app_config_id:
             logger.info("App config not found. Creating new one.")
-            result = sdk.create_app_config(
-                dict(
-                    name=app_config_hash,
-                    project_id=project_id,
-                    config_json=app_config))
-            app_config_id = result.result.id
-            logger.info(f"App config created with ID {app_config_id}")
+            try:
+                result = sdk.create_app_config(
+                    dict(
+                        name=app_config_hash,
+                        project_id=project_id,
+                        config_json=app_config))
+                app_config_id = result.result.id
+                logger.info(f"App config created with ID {app_config_id}")
+            except ApiException as e:
+                logger.exception(f"Exception creating template: {e}")
+                logger.info("Continuing execution - maybe the template "
+                            "already exists?")
 
     return app_config_id
 
