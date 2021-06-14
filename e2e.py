@@ -219,14 +219,15 @@ GLOBAL_CONFIG = {
 
 REPORT_S = 30
 
-if GLOBAL_CONFIG["ANYSCALE_CLI_TOKEN"] is None:
-    print("Missing ANYSCALE_CLI_TOKEN, retrieving from AWS secrets store")
-    # NOTE(simon) This should automatically retrieve release-automation@anyscale.com's anyscale token
-    GLOBAL_CONFIG["ANYSCALE_CLI_TOKEN"] = boto3.client(
-        "secretsmanager", region_name="us-west-2").get_secret_value(
-            SecretId="arn:aws:secretsmanager:us-west-2:029272617770:secret:"
-            "release-automation/"
-            "anyscale-token20210505220406333800000001-BcUuKB")["SecretString"]
+def maybe_fetch_api_token():
+    if GLOBAL_CONFIG["ANYSCALE_CLI_TOKEN"] is None:
+        print("Missing ANYSCALE_CLI_TOKEN, retrieving from AWS secrets store")
+        # NOTE(simon) This should automatically retrieve release-automation@anyscale.com's anyscale token
+        GLOBAL_CONFIG["ANYSCALE_CLI_TOKEN"] = boto3.client(
+            "secretsmanager", region_name="us-west-2").get_secret_value(
+                SecretId="arn:aws:secretsmanager:us-west-2:029272617770:secret:"
+                "release-automation/"
+                "anyscale-token20210505220406333800000001-BcUuKB")["SecretString"]
 
 
 class State:
@@ -1353,6 +1354,8 @@ if __name__ == "__main__":
     parser.add_argument(
         "--smoke-test", action="store_true", help="Finish quickly for testing")
     args, _ = parser.parse_known_args()
+
+    maybe_fetch_api_token()
 
     if args.ray_wheels:
         os.environ["RAY_WHEELS"] = str(args.ray_wheels)
