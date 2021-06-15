@@ -8,9 +8,40 @@ def handle_result(created_on: datetime.datetime, category: str,
                   artifacts: Dict, last_logs: str) -> Optional[str]:
     assert test_suite == "tune_tests"
 
-    if test_name == "bookkeeping_overhead":
-        time_taken = results.get("time_taken", float("inf"))
-        if time_taken > 800.:
-            return f"Bookkeeping overhead: {time_taken} > 800"
+    msg = ""
+    time_taken = results.get("time_taken", float("inf"))
+    num_terminated = results.get("trial_states", {}).get("TERMINATED", 0)
 
-    return None
+    if test_name == "long_running_large_checkpoints":
+        # Todo
+        return None
+
+    if test_name == "bookkeeping_overhead":
+        target_terminated = 10000
+        target_time = 800
+    elif test_name == "durable_trainable":
+        target_terminated = 16
+        target_time = 600
+    elif test_name == "network_overhead":
+        target_terminated = 200
+        target_time = 1000
+    elif test_name == "result_throughput_cluster":
+        target_terminated = 1000
+        target_time = 120
+    elif test_name == "result_throughput_single_node":
+        target_terminated = 96
+        target_time = 120
+    elif test_name == "xgboost_sweep":
+        target_terminated = 31
+        target_time = 3600
+    else:
+        return None
+
+    if num_terminated < target_terminated:
+        msg += f"Some trials failed " \
+               f"(num_terminated={num_terminated} < {target_terminated}). "
+    if time_taken > target_time:
+        msg += f"Took too long to complete " \
+               f"(time_taken={time_taken} > {target_time}). "
+
+    return msg or None

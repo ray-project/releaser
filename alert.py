@@ -1,4 +1,5 @@
-from typing import Any
+from collections import defaultdict
+from typing import Any, List, Tuple
 import datetime
 import hashlib
 import json
@@ -12,9 +13,11 @@ import boto3
 from e2e import GLOBAL_CONFIG
 
 from alerts.tune_tests import handle_result as tune_tests_handle_result
+from alerts.xgboost_tests import handle_result as xgboost_tests_handle_result
 
 SUITE_TO_FN = {
     "tune_tests": tune_tests_handle_result,
+    "xgboost_tests": xgboost_tests_handle_result,
 }
 
 GLOBAL_CONFIG["RELEASE_AWS_DB_STATE_TABLE"] = "alert_state"
@@ -109,7 +112,7 @@ def mark_as_handled(rds_data_client, update: bool, category: str,
         sql = (f"""
             INSERT INTO {schema}
             (category, test_suite, test_name, last_result_hash, last_notification_dt)
-            VALUES (:category, :test_suite, :test_name, :last_result_hash, :last_notification_dt)  
+            VALUES (:category, :test_suite, :test_name, :last_result_hash, :last_notification_dt)
             """)
     else:
         sql = (f"""
@@ -161,10 +164,26 @@ def mark_as_handled(rds_data_client, update: bool, category: str,
     )
 
 
-def post_alert_to_slack(channel: str, alert: str):
-    print(f"POSTING ALERT TO SLACK {channel}: {alert}")
-    return
-    markdown_lines = [alert]
+def post_alerts_to_slack(channel: str,
+                         alerts: List[Tuple[str, str, str, str]]):
+    if len(alerts) == 0:
+        logger.info("No alerts to post to slack.")
+
+    markdown_lines = [
+        f"* {len(alerts)} new release test failure found!*",
+        "",
+    ]
+
+    category_alerts = defaultdict(list)
+    for (category, test_suite, test_name, alert) in alerts:
+        category_alerts[category].append(
+            f"   *{test_suite}/{test_name}* failed: {alert}")
+
+    for category, alert_list in category_alerts.items():
+        markdown_lines.append(f"Category (branch): *{category}*")
+        markdown_lines.extend(alert_list)
+        markdown_lines.append("")
+
     slack_url = GLOBAL_CONFIG["SLACK_WEBHOOK"]
 
     resp = requests.post(
@@ -188,6 +207,8 @@ def handle_results_and_send_alerts(rds_data_client):
         last_notifications_map[(category, test_suite,
                                 test_name)] = (last_result_hash,
                                                last_notification_dt)
+
+    alerts = []
 
     # Then fetch latest results
     for result_hash, created_on, category, test_suite, test_name, status, \
@@ -217,8 +238,11 @@ def handle_results_and_send_alerts(rds_data_client):
                               status, results, artifacts, last_logs)
 
             if alert:
-                print(f"ALERT! {alert}")
-                post_alert_to_slack(GLOBAL_CONFIG["SLACK_CHANNEL"], alert)
+                logger.warning(
+                    f"Alert raised for test {test_suite}/{test_name} "
+                    f"({category}): {alert}")
+
+                alerts.append((category, test_suite, test_name, alert))
             else:
                 logger.debug(
                     f"No alert raised for test {test_suite}/{test_name} "
@@ -227,6 +251,8 @@ def handle_results_and_send_alerts(rds_data_client):
             mark_as_handled(rds_data_client, key in last_notifications_map,
                             category, test_suite, test_name, result_hash,
                             datetime.datetime.now())
+
+    post_alerts_to_slack(GLOBAL_CONFIG["SLACK_CHANNEL"], alerts)
 
 
 if __name__ == "__main__":
