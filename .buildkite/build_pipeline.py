@@ -36,8 +36,16 @@ NIGHTLY_TESTS = {
         "non_streaming_shuffle_50gb",
         "dask_on_ray_10gb_sort",
         "shuffle_1tb_large_partition",
-        "dask_on_ray_large_scale_test_no_spilling"
+        "dask_on_ray_large_scale_test_no_spilling",
     ],
+}
+
+WEEKLY_TESTS = {
+    "~/ray/benchmarks/benchmark_tests.yaml": [
+        "single_node",
+        "object_store",
+        "distributed",
+    ]
 }
 
 MANUAL_TESTS = {
@@ -49,6 +57,7 @@ MANUAL_TESTS = {
 
 SUITES = {
     "nightly": NIGHTLY_TESTS,
+    "weekly": WEEKLY_TESTS,
     "manual": MANUAL_TESTS,
 }
 
