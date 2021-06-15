@@ -492,9 +492,9 @@ def create_or_find_compute_template(
     return compute_tpl_id, compute_tpl_name
 
 
-def create_or_find_app_config(sdk: AnyscaleSDK, project_id: str,
-                              app_config: Dict[Any, Any]) -> Tuple[
-        Optional[str], Optional[str]]:
+def create_or_find_app_config(
+        sdk: AnyscaleSDK, project_id: str,
+        app_config: Dict[Any, Any]) -> Tuple[Optional[str], Optional[str]]:
     app_config_id = None
     app_config_name = None
     if app_config:
@@ -589,13 +589,15 @@ def wait_for_build_or_raise(sdk: AnyscaleSDK,
 
 
 def run_job(cluster_name: str, compute_tpl_name: str, cluster_env_name: str,
-            job_name: str, script: str,
-            script_args: List[str]) -> subprocess.CompletedProcess:
+            job_name: str, script: str, script_args: List[str],
+            env_vars: Dict[str, str]) -> subprocess.CompletedProcess:
     # Start cluster and job
     address = f"anyscale://{cluster_name}?cluster_compute={compute_tpl_name}" \
               f"&cluster_env={cluster_env_name}"
     logger.info(f"Starting job {job_name} with Ray address: {address}")
     env = copy.deepcopy(os.environ)
+    env.update(GLOBAL_CONFIG)
+    env.update(env_vars)
     env["RAY_ADDRESS"] = address
     env["RAY_JOB_NAME"] = job_name
     return subprocess.run(script.split(" ") + script_args, env=env)
@@ -709,6 +711,14 @@ def get_remote_json_content(
         source=remote_file,
         target=local_target_file)
     with open(local_target_file, "rt") as f:
+        return json.load(f)
+
+
+def get_local_json_content(local_file: Optional[str], ):
+    if not local_file:
+        logger.warning("No local file specified, returning empty dict")
+        return {}
+    with open(local_file, "rt") as f:
         return json.load(f)
 
 
@@ -951,7 +961,6 @@ def run_test_config(
     # When running the test script in client mode, the finish command is a
     # completed local process.
     def _process_finished_client_command(proc: subprocess.CompletedProcess):
-        # TODO: include logs from local driver.
         logs = f"stdout:\n{proc.stdout}\n\nstderr:\n{proc.stderr}\n"
         saved_artifacts = pull_artifacts_and_store_in_cloud(
             temp_dir=temp_dir,
@@ -963,10 +972,14 @@ def run_test_config(
         )
         logger.info("Stored results on the cloud. Returning.")
 
-        results = {
-            "passed": proc.returncode == 0,
-            "returncode": proc.returncode,
-        }
+        if results_json:
+            results = get_local_json_content(local_file=results_json, )
+        else:
+            results = {
+                "passed": int(proc.returncode == 0),
+            }
+
+        results["returncode"]: proc.returncode
 
         result_queue.put(
             State(
@@ -1035,12 +1048,14 @@ def run_test_config(
                 script_args = test_config["run"].get("args", [])
                 if smoke_test:
                     script_args += ["--smoke-test"]
-                proc = run_job(cluster_name=test_name,
-                               compute_tpl_name=compute_tpl_name,
-                               cluster_env_name=app_config_name,
-                               job_name=session_name,
-                               script=test_config["run"]["script"],
-                               script_args=script_args)
+                proc = run_job(
+                    cluster_name=test_name,
+                    compute_tpl_name=compute_tpl_name,
+                    cluster_env_name=app_config_name,
+                    job_name=session_name,
+                    script=test_config["run"]["script"],
+                    script_args=script_args,
+                    env_vars=env_vars)
                 _process_finished_client_command(proc)
                 return
 
