@@ -498,7 +498,7 @@ def create_or_find_app_config(
     app_config_id = None
     app_config_name = None
     if app_config:
-        app_config_name = f"{project_id}__{_dict_hash(app_config)}"
+        app_config_name = f"{project_id}-{_dict_hash(app_config)}"
 
         logger.info(f"Test uses an app config with hash {app_config_name}. "
                     f"Looking up existing app configs with this name.")
