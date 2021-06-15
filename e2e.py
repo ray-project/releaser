@@ -932,6 +932,9 @@ def run_test_config(
         else:
             results = {"passed": 1}
 
+        if "last_update" in results:
+            results["last_update_diff"] = time.time() - results["last_update"]
+
         if scd_id:
             logs = get_command_logs(session_controller, scd_id,
                                     test_config.get("log_lines", 50))
