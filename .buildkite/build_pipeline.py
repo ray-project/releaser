@@ -27,16 +27,11 @@ NIGHTLY_TESTS = {
         "xgboost_sweep",
     ],
     "~/ray/release/nightly_tests/nightly_tests.yaml": [
-        "shuffle_10gb",
-        "shuffle_50gb",
-        "shuffle_50gb_large_partition",
-        "shuffle_100gb",
-        "non_streaming_shuffle_100gb",
+        "shuffle_10gb", "shuffle_50gb", "shuffle_50gb_large_partition",
+        "shuffle_100gb", "non_streaming_shuffle_100gb",
         "non_streaming_shuffle_50gb_large_partition",
-        "non_streaming_shuffle_50gb",
-        "dask_on_ray_10gb_sort",
-        "dask_on_ray_100gb_sort",
-        "shuffle_1tb_large_partition",
+        "non_streaming_shuffle_50gb", "dask_on_ray_10gb_sort",
+        "dask_on_ray_100gb_sort", "shuffle_1tb_large_partition",
         "dask_on_ray_large_scale_test_no_spilling",
         "dask_on_ray_large_scale_test_spilling"
     ],
@@ -49,6 +44,21 @@ MANUAL_TESTS = {
     "~/ray/release/tune_tests/scalability_tests/tune_tests.yaml": [
         "durable_trainable",
         "long_running_large_checkpoints",
+    ],
+    "~/ray/release/long_running_tests/scalability_tests/tune_tests.yaml": [
+        "actor_deaths",
+        "apex",
+        "impala",
+        "many_actor_tasks",
+        "many_drivers",
+        "many_ppo",
+        "many_tasks",
+        "many_tasks_serialized_ids",
+        "node_failures",
+        # "object_spilling_shuffle",
+        "pbt",
+        # "serve",
+        "serve_failure",
     ],
 }
 
