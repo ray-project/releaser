@@ -12,10 +12,12 @@ import boto3
 
 from e2e import GLOBAL_CONFIG
 
+from alerts.long_running_tests import handle_result as long_running_tests_handle_result
 from alerts.tune_tests import handle_result as tune_tests_handle_result
 from alerts.xgboost_tests import handle_result as xgboost_tests_handle_result
 
 SUITE_TO_FN = {
+    "long_running_tests": long_running_tests_handle_result,
     "tune_tests": tune_tests_handle_result,
     "xgboost_tests": xgboost_tests_handle_result,
 }

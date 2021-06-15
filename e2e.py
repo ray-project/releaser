@@ -918,6 +918,13 @@ def run_test_config(
     # If a test is long running, timeout does not mean it failed
     is_long_running = test_config["run"].get("long_running", False)
 
+    # Add information to results dict
+    def _update_results(results: Dict):
+        if "last_update" in results:
+            results["last_update_diff"] = time.time() - results["last_update"]
+        if smoke_test:
+            results["smoke_test"] = True
+
     def _process_finished_command(session_controller: SessionController,
                                   scd_id: str,
                                   results: Optional[Dict] = None):
@@ -932,8 +939,7 @@ def run_test_config(
         else:
             results = {"passed": 1}
 
-        if "last_update" in results:
-            results["last_update_diff"] = time.time() - results["last_update"]
+        _update_results(results)
 
         if scd_id:
             logs = get_command_logs(session_controller, scd_id,
@@ -991,6 +997,8 @@ def run_test_config(
             }
 
         results["returncode"]: proc.returncode
+
+        _update_results(results)
 
         result_queue.put(
             State(
@@ -1315,20 +1323,23 @@ def run_test_config(
                 stop_event.set()
                 logger.warning("Process timed out.")
 
-                if is_long_running:
+                if not is_long_running:
                     logger.warning("Terminating process in 10 seconds.")
                     time.sleep(10)
                     logger.warning("Terminating process now.")
                     process.terminate()
                 else:
-                    logger.info("Process is long running. Give 2 minuts to "
+                    logger.info("Process is long running. Give 2 minutes to "
                                 "fetch result and terminate.")
                     start_terminate = time.time()
                     while time.time(
                     ) < start_terminate + 120 and process.is_alive():
                         time.sleep(1)
-                    logger.warning("Terminating forcefully now.")
-                    process.terminate()
+                    if process.is_alive():
+                        logger.warning("Terminating forcefully now.")
+                        process.terminate()
+                    else:
+                        logger.info("Long running results collected.")
                 break
             continue
 

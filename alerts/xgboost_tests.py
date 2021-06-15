@@ -22,13 +22,13 @@ def handle_result(created_on: datetime.datetime, category: str,
         msg = ""
         if test_name == "tune_small":
             target_terminated = 4
-            target_time = 300
+            target_time = 90
         elif test_name == "tune_4x32":
             target_terminated = 4
-            target_time = 900
+            target_time = 120
         elif test_name == "tune_32x4":
             target_terminated = 32
-            target_time = 900
+            target_time = 120
         else:
             return None
 
@@ -43,11 +43,11 @@ def handle_result(created_on: datetime.datetime, category: str,
     else:
         # train scripts
         if test_name == "train_small":
-            target_time = 120
+            target_time = 30
         elif test_name == "train_moderate":
-            target_time = 300
+            target_time = 60
         elif test_name == "train_gpu":
-            target_time = 120
+            target_time = 40
         else:
             return None
 
