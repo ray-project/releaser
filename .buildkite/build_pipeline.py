@@ -68,7 +68,7 @@ MANUAL_TESTS = {
         # "object_spilling_shuffle",
         "pbt",
         # "serve",
-        "serve_failure",
+        # "serve_failure",
     ],
 }
 
