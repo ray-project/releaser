@@ -81,7 +81,8 @@ only want to trigger rebuilds once per day, use `DATESTAMP` instead:
 Local testing
 -------------
 For local testing, make sure to authenticate with the ray-ossci AWS user
-(e.g. by setting the respective environment variables obtained from go/aws).
+(e.g. by setting the respective environment variables obtained from go/aws),
+or use the `--no-report` command line argument.
 
 Also make sure to set these environment variables:
 
@@ -90,7 +91,22 @@ Also make sure to set these environment variables:
 
 A test can then be run like this:
 
-python e2e.py --test-config ~/ray/release/xgboost_tests/xgboost_tests.yaml --test-name tune_small
+python e2e.py --no-report --test-config ~/ray/release/xgboost_tests/xgboost_tests.yaml --test-name tune_small
+
+The `--no-report` option disables storing the results in the DB and artifacts on S3.
+If you set this option, you do not need access to the ray-ossci AWS user.
+
+Running on Head Node vs Running with Anyscale Connect
+-----------------------------------------------------
+By default release tests run their drivers on the head node. Support is being
+added to run release tests that execute the driver as a subprocess and run
+the workload on Anyscale product via Anyscale connect.
+Note that when the driver in the test is a subprocess of releaser, releaser
+cannot be terminated before the test finishes.
+Other known feature gaps when running with Anyscale connect:
+- Kicking off a test or checking progress is not supported.
+- Downloading / uploading logs and artifacts are unsupported.
+- Logs from remote may not have finished streaming, before the driver exits.
 
 Long running tests
 ------------------
@@ -218,14 +234,21 @@ GLOBAL_CONFIG = {
 
 REPORT_S = 30
 
-if GLOBAL_CONFIG["ANYSCALE_CLI_TOKEN"] is None:
-    print("Missing ANYSCALE_CLI_TOKEN, retrieving from AWS secrets store")
-    # NOTE(simon) This should automatically retrieve release-automation@anyscale.com's anyscale token
-    GLOBAL_CONFIG["ANYSCALE_CLI_TOKEN"] = boto3.client(
-        "secretsmanager", region_name="us-west-2").get_secret_value(
+
+def maybe_fetch_api_token():
+    if GLOBAL_CONFIG["ANYSCALE_CLI_TOKEN"] is None:
+        print("Missing ANYSCALE_CLI_TOKEN, retrieving from AWS secrets store")
+        # NOTE(simon) This should automatically retrieve release-automation@anyscale.com's anyscale token
+        GLOBAL_CONFIG["ANYSCALE_CLI_TOKEN"] = boto3.client(
+            "secretsmanager", region_name="us-west-2"
+        ).get_secret_value(
             SecretId="arn:aws:secretsmanager:us-west-2:029272617770:secret:"
             "release-automation/"
             "anyscale-token20210505220406333800000001-BcUuKB")["SecretString"]
+
+
+class ReleaseTestTimeoutError(RuntimeError):
+    pass
 
 
 class State:
@@ -282,7 +305,7 @@ def get_latest_commits(repo: str, branch: str = "master") -> List[str]:
 
 def _check_stop(stop_event: multiprocessing.Event):
     if stop_event.is_set():
-        raise RuntimeError("Process timed out.")
+        raise ReleaseTestTimeoutError("Process timed out.")
 
 
 def _deep_update(d, u):
@@ -427,13 +450,16 @@ def search_running_session(sdk: AnyscaleSDK, project_id: str,
 
 def create_or_find_compute_template(
         sdk: AnyscaleSDK, project_id: str,
-        compute_tpl: Dict[Any, Any]) -> Optional[str]:
+        compute_tpl: Dict[Any, Any]) -> Tuple[Optional[str], Optional[str]]:
     compute_tpl_id = None
+    compute_tpl_name = None
     if compute_tpl:
-        compute_tpl_hash = _dict_hash(compute_tpl)
+        # As of Anyscale 0.4.1, it is an error to use the same compute template
+        # name within the same organization, between different projects.
+        compute_tpl_name = f"{project_id}/compute/{_dict_hash(compute_tpl)}"
 
         logger.info(f"Tests uses compute template "
-                    f"with hash {compute_tpl_hash}. Looking up existing "
+                    f"with name {compute_tpl_name}. Looking up existing "
                     f"templates.")
 
         paging_token = None
@@ -441,45 +467,45 @@ def create_or_find_compute_template(
             result = sdk.search_compute_templates(
                 dict(
                     project_id=project_id,
-                    name=dict(equals=compute_tpl_hash),
+                    name=dict(equals=compute_tpl_name),
                     include_anonymous=True),
                 paging_token=paging_token)
             paging_token = result.metadata.next_paging_token
 
             for res in result.results:
-                if res.name == compute_tpl_hash:
+                if res.name == compute_tpl_name:
                     compute_tpl_id = res.id
                     logger.info(
                         f"Template already exists with ID {compute_tpl_id}")
                     break
 
             if not paging_token:
-                if not compute_tpl_id:
-                    logger.info(
-                        "Compute template not found. Creating new one.")
                 break
 
         if not compute_tpl_id:
+            logger.info(f"Compute template not found. "
+                        f"Creating with name {compute_tpl_name}.")
             result = sdk.create_compute_template(
                 dict(
-                    name=compute_tpl_hash,
+                    name=compute_tpl_name,
                     project_id=project_id,
                     config=compute_tpl))
             compute_tpl_id = result.result.id
-            logger.info(f"Template created with ID {compute_tpl_id}")
+            logger.info(f"Compute template created with ID {compute_tpl_id}")
 
-    return compute_tpl_id
+    return compute_tpl_id, compute_tpl_name
 
 
-def create_or_find_app_config(sdk: AnyscaleSDK, project_id: str,
-                              app_config: Dict[Any, Any]) -> Optional[str]:
+def create_or_find_app_config(
+        sdk: AnyscaleSDK, project_id: str,
+        app_config: Dict[Any, Any]) -> Tuple[Optional[str], Optional[str]]:
     app_config_id = None
+    app_config_name = None
     if app_config:
-        app_config_hash = _dict_hash(app_config)
+        app_config_name = f"{project_id}-{_dict_hash(app_config)}"
 
-        logger.info(f"Tests uses app config "
-                    f"with hash {app_config_hash}. Looking up existing "
-                    f"app configs.")
+        logger.info(f"Test uses an app config with hash {app_config_name}. "
+                    f"Looking up existing app configs with this name.")
 
         paging_token = None
         while not app_config_id:
@@ -488,7 +514,7 @@ def create_or_find_app_config(sdk: AnyscaleSDK, project_id: str,
             paging_token = result.metadata.next_paging_token
 
             for res in result.results:
-                if res.name == app_config_hash:
+                if res.name == app_config_name:
                     app_config_id = res.id
                     logger.info(
                         f"App config already exists with ID {app_config_id}")
@@ -501,13 +527,13 @@ def create_or_find_app_config(sdk: AnyscaleSDK, project_id: str,
             logger.info("App config not found. Creating new one.")
             result = sdk.create_app_config(
                 dict(
-                    name=app_config_hash,
+                    name=app_config_name,
                     project_id=project_id,
                     config_json=app_config))
             app_config_id = result.result.id
             logger.info(f"App config created with ID {app_config_id}")
 
-    return app_config_id
+    return app_config_id, app_config_name
 
 
 def wait_for_build_or_raise(sdk: AnyscaleSDK,
@@ -566,13 +592,28 @@ def wait_for_build_or_raise(sdk: AnyscaleSDK,
     return build_id
 
 
+def run_job(cluster_name: str, compute_tpl_name: str, cluster_env_name: str,
+            job_name: str, script: str, script_args: List[str],
+            env_vars: Dict[str, str]) -> subprocess.CompletedProcess:
+    # Start cluster and job
+    address = f"anyscale://{cluster_name}?cluster_compute={compute_tpl_name}" \
+              f"&cluster_env={cluster_env_name}"
+    logger.info(f"Starting job {job_name} with Ray address: {address}")
+    env = copy.deepcopy(os.environ)
+    env.update(GLOBAL_CONFIG)
+    env.update(env_vars)
+    env["RAY_ADDRESS"] = address
+    env["RAY_JOB_NAME"] = job_name
+    return subprocess.run(
+        script.split(" ") + script_args, env=env, capture_output=True)
+
+
 def create_and_wait_for_session(
         sdk: AnyscaleSDK,
         stop_event: multiprocessing.Event,
         session_name: str,
         session_options: Dict[Any, Any],
 ) -> str:
-
     # Create session
     logger.info(f"Creating session {session_name}")
     result = sdk.create_session(session_options)
@@ -675,6 +716,14 @@ def get_remote_json_content(
         source=remote_file,
         target=local_target_file)
     with open(local_target_file, "rt") as f:
+        return json.load(f)
+
+
+def get_local_json_content(local_file: Optional[str], ):
+    if not local_file:
+        logger.warning("No local file specified, returning empty dict")
+        return {}
+    with open(local_file, "rt") as f:
         return json.load(f)
 
 
@@ -799,6 +848,7 @@ def run_test_config(
         no_terminate: bool = False,
         kick_off_only: bool = False,
         check_progress: bool = False,
+        upload_artifacts: bool = True,
 ) -> Dict[Any, Any]:
     """
 
@@ -865,6 +915,16 @@ def run_test_config(
 
     timeout = test_config["run"].get("timeout", 1800)
 
+    # If a test is long running, timeout does not mean it failed
+    is_long_running = test_config["run"].get("long_running", False)
+
+    # Add information to results dict
+    def _update_results(results: Dict):
+        if "last_update" in results:
+            results["last_update_diff"] = time.time() - results["last_update"]
+        if smoke_test:
+            results["smoke_test"] = True
+
     def _process_finished_command(session_controller: SessionController,
                                   scd_id: str,
                                   results: Optional[Dict] = None):
@@ -879,22 +939,66 @@ def run_test_config(
         else:
             results = {"passed": 1}
 
+        _update_results(results)
+
         if scd_id:
             logs = get_command_logs(session_controller, scd_id,
                                     test_config.get("log_lines", 50))
         else:
             logs = "No command found to fetch logs for"
 
+        if upload_artifacts:
+            saved_artifacts = pull_artifacts_and_store_in_cloud(
+                temp_dir=temp_dir,
+                logs=logs,  # Also save logs in cloud
+                session_name=session_name,
+                test_name=test_name,
+                artifacts=test_config.get("artifacts", {}),
+                session_controller=session_controller,
+            )
+
+            logger.info("Fetched results and stored on the cloud. Returning.")
+        else:
+            saved_artifacts = {}
+            logger.info("Usually I would have fetched the results and "
+                        "artifacts and stored them on S3.")
+
+        result_queue.put(
+            State(
+                "END",
+                time.time(),
+                {
+                    "status": "finished",
+                    "last_logs": logs,
+                    "results": results,
+                    "artifacts": saved_artifacts,
+                },
+            ))
+
+    # When running the test script in client mode, the finish command is a
+    # completed local process.
+    def _process_finished_client_command(proc: subprocess.CompletedProcess):
+        logs = f"stdout:\n{proc.stdout}\n\nstderr:\n{proc.stderr}\n"
         saved_artifacts = pull_artifacts_and_store_in_cloud(
             temp_dir=temp_dir,
             logs=logs,  # Also save logs in cloud
             session_name=session_name,
             test_name=test_name,
-            artifacts=test_config.get("artifacts", {}),
-            session_controller=session_controller,
+            artifacts=None,
+            session_controller=None,
         )
+        logger.info("Stored results on the cloud. Returning.")
 
-        logger.info("Fetched results and stored on the cloud. Returning.")
+        if results_json:
+            results = get_local_json_content(local_file=results_json, )
+        else:
+            results = {
+                "passed": int(proc.returncode == 0),
+            }
+
+        results["returncode"]: proc.returncode
+
+        _update_results(results)
 
         result_queue.put(
             State(
@@ -916,6 +1020,8 @@ def run_test_config(
         try:
             # First, look for running sessions
             session_id = search_running_session(sdk, project_id, session_name)
+            compute_tpl_name = None
+            app_config_name = None
             if not session_id:
                 logger.info("No session found.")
                 # Start session
@@ -933,11 +1039,11 @@ def run_test_config(
                     logging.info("Starting session with app/compute config")
 
                     # Find/create compute template
-                    compute_tpl_id = create_or_find_compute_template(
+                    compute_tpl_id, compute_tpl_name = create_or_find_compute_template(
                         sdk, project_id, compute_tpl)
 
                     # Find/create app config
-                    app_config_id = create_or_find_app_config(
+                    app_config_id, app_config_name = create_or_find_app_config(
                         sdk, project_id, app_config)
                     build_id = wait_for_build_or_raise(sdk, app_config_id)
 
@@ -945,12 +1051,32 @@ def run_test_config(
                     session_options["build_id"] = build_id
                     session_options["uses_app_config"] = True
 
-                session_id = create_and_wait_for_session(
-                    sdk=sdk,
-                    stop_event=stop_event,
-                    session_name=session_name,
-                    session_options=session_options,
-                )
+                if not test_config["run"].get("use_connect"):
+                    session_id = create_and_wait_for_session(
+                        sdk=sdk,
+                        stop_event=stop_event,
+                        session_name=session_name,
+                        session_options=session_options,
+                    )
+
+            if test_config["run"].get("use_connect"):
+                assert not kick_off_only, \
+                    "Unsupported for running with Anyscale connect."
+                assert compute_tpl_name, "Compute template must exist."
+                assert app_config_name, "Cluster environment must exist."
+                script_args = test_config["run"].get("args", [])
+                if smoke_test:
+                    script_args += ["--smoke-test"]
+                proc = run_job(
+                    cluster_name=test_name,
+                    compute_tpl_name=compute_tpl_name,
+                    cluster_env_name=app_config_name,
+                    job_name=session_name,
+                    script=test_config["run"]["script"],
+                    script_args=script_args,
+                    env_vars=env_vars)
+                _process_finished_client_command(proc)
+                return
 
             # Write test state json
             test_state_file = os.path.join(local_dir, "test_state.json")
@@ -1024,7 +1150,7 @@ def run_test_config(
                         "last_logs": ""
                     }))
 
-        except Exception as e:
+        except (ReleaseTestTimeoutError, Exception) as e:
             logger.error(e, exc_info=True)
 
             logs = str(e)
@@ -1035,11 +1161,17 @@ def run_test_config(
                 except Exception as e2:
                     logger.error(e2, exc_info=True)
 
-            result_queue.put(
-                State("END", time.time(), {
-                    "status": "error",
-                    "last_logs": logs
-                }))
+            # Long running tests are "finished" successfully when
+            # timed out
+            if isinstance(e, ReleaseTestTimeoutError) and is_long_running:
+                _process_finished_command(
+                    session_controller=session_controller, scd_id=scd_id)
+            else:
+                result_queue.put(
+                    State("END", time.time(), {
+                        "status": "error",
+                        "last_logs": logs
+                    }))
         finally:
             if no_terminate:
                 logger.warning(
@@ -1189,10 +1321,25 @@ def run_test_config(
         except (Empty, TimeoutError):
             if time.time() > timeout_time:
                 stop_event.set()
-                logger.warning("Process timed out")
-                time.sleep(10)
-                process.terminate()
-                logger.warning("Terminating process")
+                logger.warning("Process timed out.")
+
+                if not is_long_running:
+                    logger.warning("Terminating process in 10 seconds.")
+                    time.sleep(10)
+                    logger.warning("Terminating process now.")
+                    process.terminate()
+                else:
+                    logger.info("Process is long running. Give 2 minutes to "
+                                "fetch result and terminate.")
+                    start_terminate = time.time()
+                    while time.time(
+                    ) < start_terminate + 120 and process.is_alive():
+                        time.sleep(1)
+                    if process.is_alive():
+                        logger.warning("Terminating forcefully now.")
+                        process.terminate()
+                    else:
+                        logger.info("Long running results collected.")
                 break
             continue
 
@@ -1217,7 +1364,7 @@ def run_test_config(
 
     logger.info("Final check if everything worked.")
     try:
-        result.setdefault("status", "error")
+        result.setdefault("status", "error (status not found)")
     except (TimeoutError, Empty):
         result = {"status": "timeout", "last_logs": "Test timed out."}
 
@@ -1235,7 +1382,8 @@ def run_test(test_config_file: str,
              smoke_test: bool = False,
              no_terminate: bool = False,
              kick_off_only: bool = False,
-             check_progress=False):
+             check_progress=False,
+             report=True):
     with open(test_config_file, "rt") as f:
         test_configs = yaml.load(f, Loader=yaml.FullLoader)
 
@@ -1260,6 +1408,16 @@ def run_test(test_config_file: str,
         # local_dir is relative to test_config_file
         local_dir = os.path.join(local_dir, test_config["local_dir"])
 
+    if test_config["run"].get("use_connect"):
+        assert not kick_off_only, \
+            "--kick-off-only is unsupported when running with Anyscale connect."
+        assert not check_progress, \
+            "--check is unsupported when running with Anyscale connect."
+        if test_config.get("artifacts", {}):
+            logger.error(
+                "Saving artifacts are not yet supported when running with "
+                "Anyscale connect.")
+
     result = run_test_config(
         local_dir,
         project_id,
@@ -1268,7 +1426,8 @@ def run_test(test_config_file: str,
         smoke_test=smoke_test,
         no_terminate=no_terminate,
         kick_off_only=kick_off_only,
-        check_progress=check_progress)
+        check_progress=check_progress,
+        upload_artifacts=report)
 
     status = result.get("status", "invalid")
 
@@ -1295,7 +1454,7 @@ def run_test(test_config_file: str,
 
         test_suite = os.path.basename(test_config_file).replace(".yaml", "")
 
-        report_result(
+        report_kwargs = dict(
             test_suite=test_suite,
             test_name=test_name,
             status=status,
@@ -1304,6 +1463,12 @@ def run_test(test_config_file: str,
             artifacts=result.get("artifacts", {}),
             category=category,
         )
+
+        if report:
+            report_result(**report_kwargs)
+        else:
+            logger.info(f"Usually I would now report the following results:\n"
+                        f"{report_kwargs}")
 
         if has_errored(result):
             notify(test_config.get("owner", {}), result)
@@ -1325,6 +1490,11 @@ if __name__ == "__main__":
         default=False,
         help="Don't terminate session after failure")
     parser.add_argument(
+        "--no-report",
+        action="store_true",
+        default=False,
+        help="Do not report any results or upload to S3")
+    parser.add_argument(
         "--kick-off-only",
         action="store_true",
         default=False,
@@ -1342,6 +1512,8 @@ if __name__ == "__main__":
     parser.add_argument(
         "--smoke-test", action="store_true", help="Finish quickly for testing")
     args, _ = parser.parse_known_args()
+
+    maybe_fetch_api_token()
 
     if args.ray_wheels:
         os.environ["RAY_WHEELS"] = str(args.ray_wheels)
@@ -1376,4 +1548,5 @@ if __name__ == "__main__":
         no_terminate=args.no_terminate or args.kick_off_only,
         kick_off_only=args.kick_off_only,
         check_progress=args.check,
+        report=not args.no_report,
     )

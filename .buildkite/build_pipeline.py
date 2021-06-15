@@ -4,6 +4,16 @@ import os
 import sys
 import yaml
 
+# Env variables:
+
+# RAY_REPO          Repo to use for finding the wheel
+# RAY_BRANCH        Branch to find the wheel
+# RAY_TEST_REPO     Repo to use for test scripts
+# RAY_TEST_BRANCH   Branch for test scripts
+# FILTER_FILE       File filter
+# FILTER_TEST       Test name filter
+# RELEASE_TEST_SUITE Release test suite (e.g. manual, nightly)
+
 NIGHTLY_TESTS = {
     "~/ray/release/microbenchmark/microbenchmark.yaml": [
         "microbenchmark",
@@ -27,16 +37,16 @@ NIGHTLY_TESTS = {
         "xgboost_sweep",
     ],
     "~/ray/release/nightly_tests/nightly_tests.yaml": [
-        "shuffle_10gb",
-        "shuffle_50gb",
-        "shuffle_50gb_large_partition",
-        "shuffle_100gb",
-        "non_streaming_shuffle_100gb",
+        "shuffle_10gb", "shuffle_50gb", "shuffle_50gb_large_partition",
+        "shuffle_100gb", "non_streaming_shuffle_100gb",
         "non_streaming_shuffle_50gb_large_partition",
-        "non_streaming_shuffle_50gb",
-        "dask_on_ray_10gb_sort",
-        "shuffle_1tb_large_partition",
+        "non_streaming_shuffle_50gb", "dask_on_ray_10gb_sort",
+        "dask_on_ray_100gb_sort", "shuffle_1tb_large_partition",
         "dask_on_ray_large_scale_test_no_spilling",
+        "dask_on_ray_large_scale_test_spilling",
+    ],
+    "~/ray/release/sgd_tests/sgd_tests.yaml": [
+        "sgd_gpu",
     ],
 }
 
@@ -52,6 +62,21 @@ MANUAL_TESTS = {
     "~/ray/release/tune_tests/scalability_tests/tune_tests.yaml": [
         "durable_trainable",
         "long_running_large_checkpoints",
+    ],
+    "~/ray/release/long_running_tests/long_running_tests.yaml": [
+        "actor_deaths",
+        "apex",
+        "impala",
+        "many_actor_tasks",
+        "many_drivers",
+        "many_ppo",
+        "many_tasks",
+        "many_tasks_serialized_ids",
+        "node_failures",
+        # "object_spilling_shuffle",
+        "pbt",
+        # "serve",
+        # "serve_failure",
     ],
 }
 
