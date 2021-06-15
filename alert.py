@@ -19,7 +19,8 @@ SUITE_TO_FN = {
 
 GLOBAL_CONFIG["RELEASE_AWS_DB_STATE_TABLE"] = "alert_state"
 GLOBAL_CONFIG["SLACK_WEBHOOK"] = os.environ.get("SLACK_WEBHOOK")
-GLOBAL_CONFIG["SLACK_CHANNEL"] = os.environ.get("SLACK_CHANNEL", "#kai-bot-test")
+GLOBAL_CONFIG["SLACK_CHANNEL"] = os.environ.get("SLACK_CHANNEL",
+                                                "#kai-bot-test")
 
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
@@ -99,14 +100,9 @@ def fetch_latest_results(rds_data_client):
         yield result_hash, created_on, category, test_suite, test_name, status, results, artifacts, last_logs
 
 
-def mark_as_handled(
-        rds_data_client,
-        update: bool,
-        category: str,
-        test_suite: str,
-        test_name: str,
-        result_hash: str,
-        last_notification_dt: datetime.datetime):
+def mark_as_handled(rds_data_client, update: bool, category: str,
+                    test_suite: str, test_name: str, result_hash: str,
+                    last_notification_dt: datetime.datetime):
     schema = GLOBAL_CONFIG["RELEASE_AWS_DB_STATE_TABLE"]
 
     if not update:
@@ -165,10 +161,7 @@ def mark_as_handled(
     )
 
 
-def post_alert_to_slack(
-    channel: str,
-    alert: str
-):
+def post_alert_to_slack(channel: str, alert: str):
     print(f"POSTING ALERT TO SLACK {channel}: {alert}")
     return
     markdown_lines = [alert]
@@ -225,9 +218,7 @@ def handle_results_and_send_alerts(rds_data_client):
 
             if alert:
                 print(f"ALERT! {alert}")
-                post_alert_to_slack(
-                    GLOBAL_CONFIG["SLACK_CHANNEL"],
-                    alert)
+                post_alert_to_slack(GLOBAL_CONFIG["SLACK_CHANNEL"], alert)
             else:
                 logger.debug(
                     f"No alert raised for test {test_suite}/{test_name} "

@@ -604,9 +604,8 @@ def run_job(cluster_name: str, compute_tpl_name: str, cluster_env_name: str,
     env.update(env_vars)
     env["RAY_ADDRESS"] = address
     env["RAY_JOB_NAME"] = job_name
-    return subprocess.run(script.split(" ") + script_args,
-                          env=env,
-                          capture_output=True)
+    return subprocess.run(
+        script.split(" ") + script_args, env=env, capture_output=True)
 
 
 def create_and_wait_for_session(
@@ -1319,11 +1318,11 @@ def run_test_config(
                     logger.warning("Terminating process now.")
                     process.terminate()
                 else:
-                    logger.info(
-                        "Process is long running. Give 2 minuts to "
-                        "fetch result and terminate.")
+                    logger.info("Process is long running. Give 2 minuts to "
+                                "fetch result and terminate.")
                     start_terminate = time.time()
-                    while time.time() < start_terminate + 120 and process.is_alive():
+                    while time.time(
+                    ) < start_terminate + 120 and process.is_alive():
                         time.sleep(1)
                     logger.warning("Terminating forcefully now.")
                     process.terminate()
