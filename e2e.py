@@ -247,6 +247,10 @@ def maybe_fetch_api_token():
             "anyscale-token20210505220406333800000001-BcUuKB")["SecretString"]
 
 
+class ReleaseTestTimeoutError(RuntimeError):
+    pass
+
+
 class State:
     def __init__(self, state: str, timestamp: float, data: Any):
         self.state = state
@@ -301,7 +305,7 @@ def get_latest_commits(repo: str, branch: str = "master") -> List[str]:
 
 def _check_stop(stop_event: multiprocessing.Event):
     if stop_event.is_set():
-        raise RuntimeError("Process timed out.")
+        raise ReleaseTestTimeoutError("Process timed out.")
 
 
 def _deep_update(d, u):
@@ -600,9 +604,8 @@ def run_job(cluster_name: str, compute_tpl_name: str, cluster_env_name: str,
     env.update(env_vars)
     env["RAY_ADDRESS"] = address
     env["RAY_JOB_NAME"] = job_name
-    return subprocess.run(script.split(" ") + script_args,
-                          env=env,
-                          capture_output=True)
+    return subprocess.run(
+        script.split(" ") + script_args, env=env, capture_output=True)
 
 
 def create_and_wait_for_session(
@@ -912,6 +915,16 @@ def run_test_config(
 
     timeout = test_config["run"].get("timeout", 1800)
 
+    # If a test is long running, timeout does not mean it failed
+    is_long_running = test_config["run"].get("long_running", False)
+
+    # Add information to results dict
+    def _update_results(results: Dict):
+        if "last_update" in results:
+            results["last_update_diff"] = time.time() - results["last_update"]
+        if smoke_test:
+            results["smoke_test"] = True
+
     def _process_finished_command(session_controller: SessionController,
                                   scd_id: str,
                                   results: Optional[Dict] = None):
@@ -925,6 +938,8 @@ def run_test_config(
             )
         else:
             results = {"passed": 1}
+
+        _update_results(results)
 
         if scd_id:
             logs = get_command_logs(session_controller, scd_id,
@@ -982,6 +997,8 @@ def run_test_config(
             }
 
         results["returncode"]: proc.returncode
+
+        _update_results(results)
 
         result_queue.put(
             State(
@@ -1133,7 +1150,7 @@ def run_test_config(
                         "last_logs": ""
                     }))
 
-        except Exception as e:
+        except (ReleaseTestTimeoutError, Exception) as e:
             logger.error(e, exc_info=True)
 
             logs = str(e)
@@ -1144,11 +1161,17 @@ def run_test_config(
                 except Exception as e2:
                     logger.error(e2, exc_info=True)
 
-            result_queue.put(
-                State("END", time.time(), {
-                    "status": "error",
-                    "last_logs": logs
-                }))
+            # Long running tests are "finished" successfully when
+            # timed out
+            if isinstance(e, ReleaseTestTimeoutError) and is_long_running:
+                _process_finished_command(
+                    session_controller=session_controller, scd_id=scd_id)
+            else:
+                result_queue.put(
+                    State("END", time.time(), {
+                        "status": "error",
+                        "last_logs": logs
+                    }))
         finally:
             if no_terminate:
                 logger.warning(
@@ -1298,10 +1321,25 @@ def run_test_config(
         except (Empty, TimeoutError):
             if time.time() > timeout_time:
                 stop_event.set()
-                logger.warning("Process timed out")
-                time.sleep(10)
-                process.terminate()
-                logger.warning("Terminating process")
+                logger.warning("Process timed out.")
+
+                if not is_long_running:
+                    logger.warning("Terminating process in 10 seconds.")
+                    time.sleep(10)
+                    logger.warning("Terminating process now.")
+                    process.terminate()
+                else:
+                    logger.info("Process is long running. Give 2 minutes to "
+                                "fetch result and terminate.")
+                    start_terminate = time.time()
+                    while time.time(
+                    ) < start_terminate + 120 and process.is_alive():
+                        time.sleep(1)
+                    if process.is_alive():
+                        logger.warning("Terminating forcefully now.")
+                        process.terminate()
+                    else:
+                        logger.info("Long running results collected.")
                 break
             continue
 
