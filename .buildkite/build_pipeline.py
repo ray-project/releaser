@@ -45,7 +45,7 @@ NIGHTLY_TESTS = {
         "dask_on_ray_large_scale_test_no_spilling",
         "dask_on_ray_large_scale_test_spilling"
     ],
-    "~/ray/release/nightly_gpu_tests/nightly_gpu_tests.yaml": [
+    "~/ray/release/sgd_tests/sgd_tests.yaml": [
         "sgd_gpu",
     ],
 }
