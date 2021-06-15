@@ -27,6 +27,6 @@ def handle_result(created_on: datetime.datetime, category: str,
 
     if last_update_diff > 60:
         return f"Last update to results json was too long ago " \
-               f"({last_update_diff} > {target_update_diff})"
+               f"({last_update_diff:.2f} > {target_update_diff})"
 
     return None

@@ -42,6 +42,6 @@ def handle_result(created_on: datetime.datetime, category: str,
                f"(num_terminated={num_terminated} < {target_terminated}). "
     if time_taken > target_time:
         msg += f"Took too long to complete " \
-               f"(time_taken={time_taken} > {target_time}). "
+               f"(time_taken={time_taken:.2f} > {target_time}). "
 
     return msg or None

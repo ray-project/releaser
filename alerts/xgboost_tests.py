@@ -28,7 +28,7 @@ def handle_result(created_on: datetime.datetime, category: str,
             target_time = 120
         elif test_name == "tune_32x4":
             target_terminated = 32
-            target_time = 120
+            target_time = 600
         else:
             return None
 
@@ -53,6 +53,6 @@ def handle_result(created_on: datetime.datetime, category: str,
 
         if time_taken > target_time:
             return f"Took too long to complete " \
-                   f"(time_taken={time_taken} > {target_time}). "
+                   f"(time_taken={time_taken:.2f} > {target_time}). "
 
     return None
