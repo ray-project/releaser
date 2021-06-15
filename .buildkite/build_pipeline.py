@@ -4,6 +4,16 @@ import os
 import sys
 import yaml
 
+# Env variables:
+
+# RAY_REPO          Repo to use for finding the wheel
+# RAY_BRANCH        Branch to find the wheel
+# RAY_TEST_REPO     Repo to use for test scripts
+# RAY_TEST_BRANCH   Branch for test scripts
+# FILTER_FILE       File filter
+# FILTER_TEST       Test name filter
+# RELEASE_TEST_SUITE Release test suite (e.g. manual, nightly)
+
 NIGHTLY_TESTS = {
     "~/ray/release/microbenchmark/microbenchmark.yaml": [
         "microbenchmark",
@@ -45,7 +55,7 @@ MANUAL_TESTS = {
         "durable_trainable",
         "long_running_large_checkpoints",
     ],
-    "~/ray/release/long_running_tests/scalability_tests/tune_tests.yaml": [
+    "~/ray/release/long_running_tests/long_running_tests.yaml": [
         "actor_deaths",
         "apex",
         "impala",
