@@ -1,5 +1,5 @@
-from collections import defaultdict
-from typing import Any, List, Tuple
+from collections import defaultdict, Counter
+from typing import Any, List, Tuple, Mapping, Optional
 import datetime
 import hashlib
 import json
@@ -168,7 +168,7 @@ def mark_as_handled(rds_data_client, update: bool, category: str,
 
 def post_alerts_to_slack(channel: str,
                          alerts: List[Tuple[str, str, str, str]],
-                         non_alerts: int):
+                         non_alerts: Mapping[str, int]):
     if len(alerts) == 0:
         logger.info("No alerts to post to slack.")
         return
@@ -188,8 +188,12 @@ def post_alerts_to_slack(channel: str,
         markdown_lines.extend(alert_list)
         markdown_lines.append("")
 
+    total_non_alerts = sum(n for n in non_alerts.values())
+    non_alert_detail = [f"{n} on {c}" for c, n in non_alerts.items()]
+
     markdown_lines += [
-        f"Additionally, {non_alerts} tests passed successfully."
+        f"Additionally, {total_non_alerts} tests passed successfully "
+        f"({', '.join(non_alert_detail)})."
     ]
 
     slack_url = GLOBAL_CONFIG["SLACK_WEBHOOK"]
@@ -217,7 +221,7 @@ def handle_results_and_send_alerts(rds_data_client):
                                                last_notification_dt)
 
     alerts = []
-    non_alerts = 0
+    non_alerts = Counter()
 
     # Then fetch latest results
     for result_hash, created_on, category, test_suite, test_name, status, \
@@ -256,7 +260,7 @@ def handle_results_and_send_alerts(rds_data_client):
                 logger.debug(
                     f"No alert raised for test {test_suite}/{test_name} "
                     f"({category})")
-                non_alerts += 1
+                non_alerts[category] += 1
 
             mark_as_handled(rds_data_client, key in last_notifications_map,
                             category, test_suite, test_name, result_hash,

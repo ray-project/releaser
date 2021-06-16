@@ -9,9 +9,13 @@ def handle_result(created_on: datetime.datetime, category: str,
     assert test_suite == "tune_tests"
 
     msg = ""
+    success = status == "finished"
     time_taken = results.get("time_taken", float("inf"))
     num_terminated = results.get("trial_states", {}).get("TERMINATED", 0)
     was_smoke_test = results.get("smoke_test", False)
+
+    if not success:
+        msg += "Test script failed."
 
     if test_name == "long_running_large_checkpoints":
         last_update_diff = results.get("last_update_diff", float("inf"))
