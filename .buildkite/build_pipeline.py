@@ -37,7 +37,7 @@ NIGHTLY_TESTS = {
     ],
     "~/ray/release/tune_tests/scalability_tests/tune_tests.yaml": [
         "bookkeeping_overhead",
-        "network_overhead",
+        SmokeTest("network_overhead"),
         "result_throughput_cluster",
         "result_throughput_single_node",
         "xgboost_sweep",
@@ -95,6 +95,9 @@ WEEKLY_TESTS = {
         "pbt",
         # "serve",
         # "serve_failure",
+    ],
+    "~/ray/release/tune_tests/scalability_tests/tune_tests.yaml": [
+        "network_overhead",
     ],
 }
 
