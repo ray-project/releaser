@@ -591,13 +591,15 @@ def run_job(cluster_name: str, compute_tpl_name: str, cluster_env_name: str,
             env_vars: Dict[str, str]) -> subprocess.CompletedProcess:
     # Start cluster and job
     address = f"anyscale://{cluster_name}?cluster_compute={compute_tpl_name}" \
-              f"&cluster_env={cluster_env_name}&autosuspend=5"
+              f"&cluster_env={cluster_env_name}&autosuspend=5&&update=True"
     logger.info(f"Starting job {job_name} with Ray address: {address}")
     env = copy.deepcopy(os.environ)
     env.update(GLOBAL_CONFIG)
     env.update(env_vars)
     env["RAY_ADDRESS"] = address
     env["RAY_JOB_NAME"] = job_name
+    # TODO(mwtian): stream captured output to terminal, and apply control
+    # sequences.
     return subprocess.run(
         script.split(" ") + script_args, env=env, capture_output=True)
 
@@ -973,6 +975,7 @@ def run_test_config(
     # completed local process.
     def _process_finished_client_command(proc: subprocess.CompletedProcess):
         logs = f"stdout:\n{proc.stdout}\n\nstderr:\n{proc.stderr}\n"
+        print(logs)
         saved_artifacts = pull_artifacts_and_store_in_cloud(
             temp_dir=temp_dir,
             logs=logs,  # Also save logs in cloud
@@ -1526,6 +1529,7 @@ if __name__ == "__main__":
         commits = get_latest_commits(repo, branch)
         logger.info(f"Latest 10 commits for branch {branch}: {commits}")
         for commit in commits:
+            # TODO(mwtian): generate URL based on system?
             if wheel_exists(version, branch, commit):
                 url = wheel_url(version, branch, commit)
                 os.environ["RAY_WHEELS"] = url
