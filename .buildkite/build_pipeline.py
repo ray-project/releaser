@@ -205,10 +205,31 @@ def build_pipeline(steps):
     return all_steps
 
 
-if __name__ == "__main__":
-    TEST_SUITE = os.environ.get("RELEASE_TEST_SUITE", "nightly")
-    PIPELINE_SPEC = SUITES[TEST_SUITE]
+def alert_pipeline(stats: bool = False):
+    step_conf = copy.deepcopy(DEFAULT_STEP_TEMPLATE)
 
-    steps = build_pipeline(PIPELINE_SPEC)
+    cmd = "python alert.py"
+    if stats:
+        cmd += " --stats"
+
+    step_conf["commands"] = [
+        "pip install -q -r requirements.txt",
+        "pip install -U boto3 botocore",
+        cmd,
+    ]
+    step_conf["label"] = f"Send periodic alert (stats_only = {stats})"
+    return [step_conf]
+
+
+if __name__ == "__main__":
+    alert = os.environ.get("RELEASE_ALERT", "0")
+
+    if alert in ["1", "stats"]:
+        steps = alert_pipeline(alert == "stats")
+    else:
+        TEST_SUITE = os.environ.get("RELEASE_TEST_SUITE", "nightly")
+        PIPELINE_SPEC = SUITES[TEST_SUITE]
+
+        steps = build_pipeline(PIPELINE_SPEC)
 
     yaml.dump({"steps": steps}, sys.stdout)
