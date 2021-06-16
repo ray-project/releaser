@@ -420,12 +420,6 @@ def report_result(test_suite: str, test_name: str, status: str, logs: str,
     )
 
 
-def notify(owner: Dict[Any, Any], result: Dict[Any, Any]):
-    logger.error(f"I would now inform {owner['slack']} about this result: "
-                 f"{result}")
-    # Todo: Send to slack?
-
-
 def _cleanup_session(sdk: AnyscaleSDK, session_id: str):
     if session_id:
         # Just trigger a request. No need to wait until session shutdown.
@@ -1478,7 +1472,6 @@ def run_test(test_config_file: str,
                         f"{report_kwargs}")
 
         if has_errored(result):
-            notify(test_config.get("owner", {}), result)
             raise RuntimeError(last_logs)
 
     return
