@@ -1306,6 +1306,13 @@ def run_test_config(
 
     build_timeout = test_config["run"].get("build_timeout", 1800)
 
+    msg = f"This will now run test {test_name}."
+    if smoke_test:
+        msg += " This is a smoke test."
+    if is_long_running:
+        msg += " This is a long running test."
+    logger.info(msg)
+
     logger.info(f"Starting process with timeout {timeout} "
                 f"(build timeout {build_timeout})")
     process.start()
