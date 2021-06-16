@@ -13,12 +13,15 @@ import boto3
 
 from e2e import GLOBAL_CONFIG
 
+from alerts.default import handle_result as default_handle_result
+from alerts.rllib_tests import handle_result as rllib_tests_handle_result
 from alerts.long_running_tests import handle_result as long_running_tests_handle_result
 from alerts.tune_tests import handle_result as tune_tests_handle_result
 from alerts.xgboost_tests import handle_result as xgboost_tests_handle_result
 
 SUITE_TO_FN = {
     "long_running_tests": long_running_tests_handle_result,
+    "rllib_tests": rllib_tests_handle_result,
     "tune_tests": tune_tests_handle_result,
     "xgboost_tests": xgboost_tests_handle_result,
 }
@@ -151,7 +154,7 @@ def mark_as_handled(rds_data_client, update: bool, category: str,
             {
                 "name": "test_suite",
                 "value": {
-                    "stringValue": test_suite
+                    "stringValue": test_suite or ""
                 }
             },
             {
@@ -233,7 +236,7 @@ def post_statistics_to_slack(channel: str,
 
     category_alerts = defaultdict(list)
     for (category, test_suite, test_name, alert) in alerts:
-        category_alerts[category].append(f"{test_suite}/{test_name}")
+        category_alerts[category].append(f"`{test_suite}/{test_name}`")
 
     alert_detail = [f"{len(a)} on {c}" for c, a in category_alerts.items()]
 
@@ -315,10 +318,12 @@ def handle_results_and_get_alerts(
             handle_fn = SUITE_TO_FN.get(test_suite, None)
             if not handle_fn:
                 logger.warning(f"No handle for suite {test_suite}")
-                continue
-
-            alert = handle_fn(created_on, category, test_suite, test_name,
-                              status, results, artifacts, last_logs)
+                alert = default_handle_result(created_on, category, test_suite,
+                                              test_name, status, results,
+                                              artifacts, last_logs)
+            else:
+                alert = handle_fn(created_on, category, test_suite, test_name,
+                                  status, results, artifacts, last_logs)
 
             if alert:
                 logger.warning(
