@@ -21,27 +21,6 @@ class SmokeTest(str):
 
 
 NIGHTLY_TESTS = {
-    "~/ray/release/microbenchmark/microbenchmark.yaml": [
-        "microbenchmark",
-    ],
-    "~/ray/release/xgboost_tests/xgboost_tests.yaml": [
-        "train_small",
-        "train_moderate",
-        "train_gpu",
-        "tune_small",
-        "tune_4x32",
-        "tune_32x4",
-        "ft_small_elastic",
-        "ft_small_non_elastic",
-        "distributed_api_test",
-    ],
-    "~/ray/release/tune_tests/scalability_tests/tune_tests.yaml": [
-        "bookkeeping_overhead",
-        SmokeTest("network_overhead"),
-        "result_throughput_cluster",
-        "result_throughput_single_node",
-        "xgboost_sweep",
-    ],
     "~/ray/release/long_running_tests/long_running_tests.yaml": [
         SmokeTest("actor_deaths"),
         SmokeTest("apex"),
@@ -55,6 +34,9 @@ NIGHTLY_TESTS = {
         SmokeTest("pbt"),
         # SmokeTest("serve"),
         # SmokeTest("serve_failure"),
+    ],
+    "~/ray/release/microbenchmark/microbenchmark.yaml": [
+        "microbenchmark",
     ],
     "~/ray/release/nightly_tests/nightly_tests.yaml": [
         "shuffle_10gb",
@@ -72,6 +54,25 @@ NIGHTLY_TESTS = {
     ],
     "~/ray/release/sgd_tests/sgd_tests.yaml": [
         "sgd_gpu",
+    ],
+    "~/ray/release/tune_tests/scalability_tests/tune_tests.yaml": [
+        "bookkeeping_overhead",
+        SmokeTest("long_running_large_checkpoints"),
+        SmokeTest("network_overhead"),
+        "result_throughput_cluster",
+        "result_throughput_single_node",
+        "xgboost_sweep",
+    ],
+    "~/ray/release/xgboost_tests/xgboost_tests.yaml": [
+        "train_small",
+        "train_moderate",
+        "train_gpu",
+        "tune_small",
+        "tune_4x32",
+        "tune_32x4",
+        "ft_small_elastic",
+        "ft_small_non_elastic",
+        "distributed_api_test",
     ],
 }
 
@@ -98,13 +99,13 @@ WEEKLY_TESTS = {
     ],
     "~/ray/release/tune_tests/scalability_tests/tune_tests.yaml": [
         "network_overhead",
+        "long_running_large_checkpoints",
     ],
 }
 
 MANUAL_TESTS = {
     "~/ray/release/tune_tests/scalability_tests/tune_tests.yaml": [
         "durable_trainable",
-        "long_running_large_checkpoints",
     ],
 }
 
