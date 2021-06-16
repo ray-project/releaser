@@ -107,6 +107,11 @@ MANUAL_TESTS = {
     "~/ray/release/tune_tests/scalability_tests/tune_tests.yaml": [
         "durable_trainable",
     ],
+    "~/ray/release/rllib_tests/rllib_tests.yaml": [
+        "learning_tests",
+        "example_scripts_on_gpu_tests",
+        "stress_tests",
+    ],
 }
 
 SUITES = {
