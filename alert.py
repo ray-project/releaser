@@ -1,3 +1,4 @@
+import argparse
 from collections import defaultdict, Counter
 from typing import Any, List, Tuple, Mapping, Optional
 import datetime
@@ -69,15 +70,29 @@ def fetch_latest_alerts(rds_data_client):
         yield category, test_suite, test_name, last_result_hash, last_notification_dt
 
 
-def fetch_latest_results(rds_data_client):
+def fetch_latest_results(rds_data_client,
+                         fetch_since: Optional[datetime.datetime] = None):
     schema = GLOBAL_CONFIG["RELEASE_AWS_DB_TABLE"]
 
     sql = (f"""
         SELECT DISTINCT ON (category, test_suite, test_name)
                created_on, category, test_suite, test_name, status, results, artifacts, last_logs
-        FROM   {schema}
-        ORDER BY category, test_suite, test_name, created_on DESC
-        """)
+        FROM   {schema} """)
+
+    parameters = []
+    if fetch_since is not None:
+        sql += "WHERE created_on >= :created_on "
+        parameters = [
+            {
+                "name": "created_on",
+                "typeHint": "TIMESTAMP",
+                "value": {
+                    "stringValue": fetch_since.strftime("%Y-%m-%d %H:%M:%S")
+                },
+            },
+        ]
+
+    sql += "ORDER BY category, test_suite, test_name, created_on DESC"
 
     result = rds_data_client.execute_statement(
         database=GLOBAL_CONFIG["RELEASE_AWS_DB_NAME"],
@@ -85,6 +100,7 @@ def fetch_latest_results(rds_data_client):
         resourceArn=GLOBAL_CONFIG["RELEASE_AWS_DB_RESOURCE_ARN"],
         schema=schema,
         sql=sql,
+        parameters=parameters,
     )
     for row in result["records"]:
         created_on, category, test_suite, test_name, status, results, artifacts, last_logs = (
@@ -166,8 +182,7 @@ def mark_as_handled(rds_data_client, update: bool, category: str,
     )
 
 
-def post_alerts_to_slack(channel: str,
-                         alerts: List[Tuple[str, str, str, str]],
+def post_alerts_to_slack(channel: str, alerts: List[Tuple[str, str, str, str]],
                          non_alerts: Mapping[str, int]):
     if len(alerts) == 0:
         logger.info("No alerts to post to slack.")
@@ -211,7 +226,62 @@ def post_alerts_to_slack(channel: str,
     print(resp.text)
 
 
-def handle_results_and_send_alerts(rds_data_client):
+def post_statistics_to_slack(channel: str,
+                             alerts: List[Tuple[str, str, str, str]],
+                             non_alerts: Mapping[str, int]):
+    total_alerts = len(alerts)
+
+    category_alerts = defaultdict(list)
+    for (category, test_suite, test_name, alert) in alerts:
+        category_alerts[category].append(f"{test_suite}/{test_name}")
+
+    alert_detail = [f"{len(a)} on {c}" for c, a in category_alerts.items()]
+
+    total_non_alerts = sum(n for n in non_alerts.values())
+    non_alert_detail = [f"{n} on {c}" for c, n in non_alerts.items()]
+
+    markdown_lines = [
+        "*Periodic release test report*", "", f"In the past 24 hours, "
+        f"*{total_non_alerts}* release tests finished successfully, and "
+        f"*{total_alerts}* release tests failed."
+    ]
+
+    markdown_lines.append("")
+
+    if total_alerts:
+        markdown_lines.append(f"*Failing:* {', '.join(alert_detail)}")
+        for c, a in category_alerts.items():
+            markdown_lines.append(f"  *{c}*: {', '.join(sorted(a))}")
+    else:
+        markdown_lines.append(f"*Failing:* None")
+
+    markdown_lines.append("")
+
+    if total_non_alerts:
+        markdown_lines.append(f"*Passing:* {', '.join(non_alert_detail)}")
+    else:
+        markdown_lines.append(f"*Passing:* None")
+
+    slack_url = GLOBAL_CONFIG["SLACK_WEBHOOK"]
+
+    resp = requests.post(
+        slack_url,
+        json={
+            "text": "\n".join(markdown_lines),
+            "channel": channel,
+            "username": "Fail Bot",
+            "icon_emoji": ":red_circle:",
+        },
+    )
+    print(resp.status_code)
+    print(resp.text)
+
+
+def handle_results_and_get_alerts(
+        rds_data_client,
+        fetch_since: Optional[datetime.datetime] = None,
+        always_try_alert: bool = False,
+        no_status_update: bool = False):
     # First build a map of last notifications
     last_notifications_map = {}
     for category, test_suite, test_name, last_result_hash, \
@@ -225,10 +295,10 @@ def handle_results_and_send_alerts(rds_data_client):
 
     # Then fetch latest results
     for result_hash, created_on, category, test_suite, test_name, status, \
-            results, artifacts, last_logs in fetch_latest_results(rds_data_client):
+            results, artifacts, last_logs in fetch_latest_results(rds_data_client, fetch_since=fetch_since):
         key = (category, test_suite, test_name)
 
-        try_alert = False
+        try_alert = always_try_alert
         if key in last_notifications_map:
             # If we have an alert for this key, fetch info
             last_result_hash, last_notification_dt = last_notifications_map[
@@ -262,14 +332,37 @@ def handle_results_and_send_alerts(rds_data_client):
                     f"({category})")
                 non_alerts[category] += 1
 
-            mark_as_handled(rds_data_client, key in last_notifications_map,
-                            category, test_suite, test_name, result_hash,
-                            datetime.datetime.now())
+            if not no_status_update:
+                mark_as_handled(rds_data_client, key in last_notifications_map,
+                                category, test_suite, test_name, result_hash,
+                                datetime.datetime.now())
 
-    post_alerts_to_slack(GLOBAL_CONFIG["SLACK_CHANNEL"], alerts, non_alerts)
+    return alerts, non_alerts
 
 
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "--stats",
+        action="store_true",
+        default=False,
+        help="Finish quickly for training.")
+    args = parser.parse_args()
+
     rds_data_client = boto3.client("rds-data", region_name="us-west-2")
 
-    handle_results_and_send_alerts(rds_data_client)
+    if args.stats:
+        # Only update last 24 hour stats
+        fetch_since = datetime.datetime.now() - datetime.timedelta(days=1)
+        alerts, non_alerts = handle_results_and_get_alerts(
+            rds_data_client,
+            fetch_since=fetch_since,
+            always_try_alert=True,
+            no_status_update=True)
+        post_statistics_to_slack(GLOBAL_CONFIG["SLACK_CHANNEL"], alerts,
+                                 non_alerts)
+
+    else:
+        alerts, non_alerts = handle_results_and_get_alerts(rds_data_client)
+        post_alerts_to_slack(GLOBAL_CONFIG["SLACK_CHANNEL"], alerts,
+                             non_alerts)
