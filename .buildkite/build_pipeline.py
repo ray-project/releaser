@@ -2,6 +2,7 @@ import copy
 import logging
 import os
 import sys
+
 import yaml
 
 # Env variables:
@@ -13,6 +14,11 @@ import yaml
 # FILTER_FILE       File filter
 # FILTER_TEST       Test name filter
 # RELEASE_TEST_SUITE Release test suite (e.g. manual, nightly)
+
+
+class SmokeTest(str):
+    pass
+
 
 NIGHTLY_TESTS = {
     "~/ray/release/microbenchmark/microbenchmark.yaml": [
@@ -36,12 +42,31 @@ NIGHTLY_TESTS = {
         "result_throughput_single_node",
         "xgboost_sweep",
     ],
+    "~/ray/release/long_running_tests/long_running_tests.yaml": [
+        SmokeTest("actor_deaths"),
+        SmokeTest("apex"),
+        SmokeTest("impala"),
+        SmokeTest("many_actor_tasks"),
+        SmokeTest("many_drivers"),
+        SmokeTest("many_ppo"),
+        SmokeTest("many_tasks"),
+        SmokeTest("many_tasks_serialized_ids"),
+        SmokeTest("node_failures"),
+        SmokeTest("pbt"),
+        # SmokeTest("serve"),
+        # SmokeTest("serve_failure"),
+    ],
     "~/ray/release/nightly_tests/nightly_tests.yaml": [
-        "shuffle_10gb", "shuffle_50gb", "shuffle_50gb_large_partition",
-        "shuffle_100gb", "non_streaming_shuffle_100gb",
+        "shuffle_10gb",
+        "shuffle_50gb",
+        "shuffle_50gb_large_partition",
+        "shuffle_100gb",
+        "non_streaming_shuffle_100gb",
         "non_streaming_shuffle_50gb_large_partition",
-        "non_streaming_shuffle_50gb", "dask_on_ray_10gb_sort",
-        "dask_on_ray_100gb_sort", "shuffle_1tb_large_partition",
+        "non_streaming_shuffle_50gb",
+        "dask_on_ray_10gb_sort",
+        "dask_on_ray_100gb_sort",
+        "shuffle_1tb_large_partition",
         "dask_on_ray_large_scale_test_no_spilling",
         "dask_on_ray_large_scale_test_spilling",
     ],
@@ -55,14 +80,8 @@ WEEKLY_TESTS = {
         "single_node",
         "object_store",
         "distributed",
-    ]
-}
-
-MANUAL_TESTS = {
-    "~/ray/release/tune_tests/scalability_tests/tune_tests.yaml": [
-        "durable_trainable",
-        "long_running_large_checkpoints",
     ],
+    # Full long running tests (1 day runtime)
     "~/ray/release/long_running_tests/long_running_tests.yaml": [
         "actor_deaths",
         "apex",
@@ -73,10 +92,16 @@ MANUAL_TESTS = {
         "many_tasks",
         "many_tasks_serialized_ids",
         "node_failures",
-        # "object_spilling_shuffle",
         "pbt",
         # "serve",
         # "serve_failure",
+    ],
+}
+
+MANUAL_TESTS = {
+    "~/ray/release/tune_tests/scalability_tests/tune_tests.yaml": [
+        "durable_trainable",
+        "long_running_large_checkpoints",
     ],
 }
 
@@ -152,6 +177,10 @@ def build_pipeline(steps):
                       f"--category {RAY_BRANCH} "
                       f"--test-config {test_file} "
                       f"--test-name {test_name}")
+
+            if isinstance(test_name, SmokeTest):
+                logging.info("This test will run as a smoke test.")
+                cmd += " --smoke-test"
 
             step_conf["commands"] = [
                 "pip install -q -r requirements.txt",
