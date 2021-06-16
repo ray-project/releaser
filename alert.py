@@ -27,7 +27,7 @@ SUITE_TO_FN = {
 }
 
 GLOBAL_CONFIG["RELEASE_AWS_DB_STATE_TABLE"] = "alert_state"
-GLOBAL_CONFIG["SLACK_WEBHOOK"] = os.environ.get("SLACK_WEBHOOK")
+GLOBAL_CONFIG["SLACK_WEBHOOK"] = os.environ.get("SLACK_WEBHOOK", "")
 GLOBAL_CONFIG["SLACK_CHANNEL"] = os.environ.get("SLACK_CHANNEL",
                                                 "#kai-bot-test")
 
@@ -39,6 +39,17 @@ formatter = logging.Formatter(fmt="[%(levelname)s %(asctime)s] "
                               "%(message)s")
 handler.setFormatter(formatter)
 logger.addHandler(handler)
+
+
+def maybe_fetch_slack_webhook():
+    if GLOBAL_CONFIG["SLACK_WEBHOOK"] is None:
+        print("Missing SLACK_WEBHOOK, retrieving from AWS secrets store")
+        GLOBAL_CONFIG["SLACK_WEBHOOK"] = boto3.client(
+            "secretsmanager", region_name="us-west-2"
+        ).get_secret_value(
+            SecretId="arn:aws:secretsmanager:us-west-2:029272617770:secret:"
+            "release-automation/"
+            "slack-webhook-Na0CFP")["SecretString"]
 
 
 def _obj_hash(obj: Any) -> str:
@@ -353,6 +364,8 @@ if __name__ == "__main__":
         default=False,
         help="Finish quickly for training.")
     args = parser.parse_args()
+
+    maybe_fetch_slack_webhook()
 
     rds_data_client = boto3.client("rds-data", region_name="us-west-2")
 
