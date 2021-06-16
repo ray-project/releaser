@@ -167,12 +167,14 @@ def mark_as_handled(rds_data_client, update: bool, category: str,
 
 
 def post_alerts_to_slack(channel: str,
-                         alerts: List[Tuple[str, str, str, str]]):
+                         alerts: List[Tuple[str, str, str, str]],
+                         non_alerts: int):
     if len(alerts) == 0:
         logger.info("No alerts to post to slack.")
+        return
 
     markdown_lines = [
-        f"* {len(alerts)} new release test failure found!*",
+        f"* {len(alerts)} new release test failures found!*",
         "",
     ]
 
@@ -182,9 +184,13 @@ def post_alerts_to_slack(channel: str,
             f"   *{test_suite}/{test_name}* failed: {alert}")
 
     for category, alert_list in category_alerts.items():
-        markdown_lines.append(f"Category (branch): *{category}*")
+        markdown_lines.append(f"Branch: *{category}*")
         markdown_lines.extend(alert_list)
         markdown_lines.append("")
+
+    markdown_lines += [
+        f"Additionally, {non_alerts} tests passed successfully."
+    ]
 
     slack_url = GLOBAL_CONFIG["SLACK_WEBHOOK"]
 
@@ -211,6 +217,7 @@ def handle_results_and_send_alerts(rds_data_client):
                                                last_notification_dt)
 
     alerts = []
+    non_alerts = 0
 
     # Then fetch latest results
     for result_hash, created_on, category, test_suite, test_name, status, \
@@ -249,12 +256,13 @@ def handle_results_and_send_alerts(rds_data_client):
                 logger.debug(
                     f"No alert raised for test {test_suite}/{test_name} "
                     f"({category})")
+                non_alerts += 1
 
             mark_as_handled(rds_data_client, key in last_notifications_map,
                             category, test_suite, test_name, result_hash,
                             datetime.datetime.now())
 
-    post_alerts_to_slack(GLOBAL_CONFIG["SLACK_CHANNEL"], alerts)
+    post_alerts_to_slack(GLOBAL_CONFIG["SLACK_CHANNEL"], alerts, non_alerts)
 
 
 if __name__ == "__main__":
