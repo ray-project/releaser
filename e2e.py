@@ -591,7 +591,7 @@ def run_job(cluster_name: str, compute_tpl_name: str, cluster_env_name: str,
             env_vars: Dict[str, str]) -> subprocess.CompletedProcess:
     # Start cluster and job
     address = f"anyscale://{cluster_name}?cluster_compute={compute_tpl_name}" \
-              f"&cluster_env={cluster_env_name}"
+              f"&cluster_env={cluster_env_name}&autosuspend=5"
     logger.info(f"Starting job {job_name} with Ray address: {address}")
     env = copy.deepcopy(os.environ)
     env.update(GLOBAL_CONFIG)
