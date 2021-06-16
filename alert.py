@@ -42,7 +42,7 @@ logger.addHandler(handler)
 
 
 def maybe_fetch_slack_webhook():
-    if GLOBAL_CONFIG["SLACK_WEBHOOK"] is None:
+    if GLOBAL_CONFIG["SLACK_WEBHOOK"] in [None, ""]:
         print("Missing SLACK_WEBHOOK, retrieving from AWS secrets store")
         GLOBAL_CONFIG["SLACK_WEBHOOK"] = boto3.client(
             "secretsmanager", region_name="us-west-2"
