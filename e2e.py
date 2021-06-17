@@ -443,8 +443,10 @@ def search_running_session(sdk: AnyscaleSDK, project_id: str,
 
 
 def create_or_find_compute_template(
-        sdk: AnyscaleSDK, project_id: str,
-        compute_tpl: Dict[Any, Any]) -> Tuple[Optional[str], Optional[str]]:
+        sdk: AnyscaleSDK,
+        project_id: str,
+        compute_tpl: Dict[Any, Any],
+        _repeat: bool = True) -> Tuple[Optional[str], Optional[str]]:
     compute_tpl_id = None
     compute_tpl_name = None
     if compute_tpl:
@@ -479,20 +481,38 @@ def create_or_find_compute_template(
         if not compute_tpl_id:
             logger.info(f"Compute template not found. "
                         f"Creating with name {compute_tpl_name}.")
-            result = sdk.create_compute_template(
-                dict(
-                    name=compute_tpl_name,
-                    project_id=project_id,
-                    config=compute_tpl))
-            compute_tpl_id = result.result.id
+            try:
+                result = sdk.create_compute_template(
+                    dict(
+                        name=compute_tpl_name,
+                        project_id=project_id,
+                        config=compute_tpl))
+                compute_tpl_id = result.result.id
+            except Exception as e:
+                if _repeat:
+                    logger.warning(
+                        f"Got exception when trying to create compute "
+                        f"template: {e}. Sleeping for 10 seconds and then "
+                        f"try again once...")
+                    time.sleep(10)
+                    return create_or_find_compute_template(
+                        sdk=sdk,
+                        project_id=project_id,
+                        compute_tpl=compute_tpl,
+                        _repeat=False)
+
+                raise e
+
             logger.info(f"Compute template created with ID {compute_tpl_id}")
 
     return compute_tpl_id, compute_tpl_name
 
 
 def create_or_find_app_config(
-        sdk: AnyscaleSDK, project_id: str,
-        app_config: Dict[Any, Any]) -> Tuple[Optional[str], Optional[str]]:
+        sdk: AnyscaleSDK,
+        project_id: str,
+        app_config: Dict[Any, Any],
+        _repeat: bool = True) -> Tuple[Optional[str], Optional[str]]:
     app_config_id = None
     app_config_name = None
     if app_config:
@@ -519,12 +539,28 @@ def create_or_find_app_config(
 
         if not app_config_id:
             logger.info("App config not found. Creating new one.")
-            result = sdk.create_app_config(
-                dict(
-                    name=app_config_name,
-                    project_id=project_id,
-                    config_json=app_config))
-            app_config_id = result.result.id
+            try:
+                result = sdk.create_app_config(
+                    dict(
+                        name=app_config_name,
+                        project_id=project_id,
+                        config_json=app_config))
+                app_config_id = result.result.id
+            except Exception as e:
+                if _repeat:
+                    logger.warning(
+                        f"Got exception when trying to create app "
+                        f"config: {e}. Sleeping for 10 seconds and then "
+                        f"try again once...")
+                    time.sleep(10)
+                    return create_or_find_app_config(
+                        sdk=sdk,
+                        project_id=project_id,
+                        app_config=app_config,
+                        _repeat=False)
+
+                raise e
+
             logger.info(f"App config created with ID {app_config_id}")
 
     return app_config_id, app_config_name
