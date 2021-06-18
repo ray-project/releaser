@@ -986,6 +986,11 @@ def run_test_config(
     )
 
     timeout = test_config["run"].get("timeout", 1800)
+    if "RELEASE_OVERRIDE_TIMEOUT" in os.environ:
+        previous_timeout = timeout
+        timeout = int(os.environ.get("RELEASE_OVERRIDE_TIMEOUT", str(timeout)))
+        logger.warning(f"Release test timeout override: {timeout} "
+                       f"(would have been {previous_timeout})")
 
     # If a test is long running, timeout does not mean it failed
     is_long_running = test_config["run"].get("long_running", False)
