@@ -261,6 +261,30 @@ class State:
 sys.path.insert(0, anyscale.ANYSCALE_RAY_DIR)
 
 
+def anyscale_project_url(project_id: str):
+    return f"{GLOBAL_CONFIG['ANYSCALE_HOST']}" \
+           f"/o/anyscale-internal/projects/{project_id}" \
+           f"/?tab=session-list"
+
+
+def anyscale_session_url(project_id: str, session_id: str):
+    return f"{GLOBAL_CONFIG['ANYSCALE_HOST']}" \
+           f"/o/anyscale-internal/projects/{project_id}" \
+           f"/clusters/{session_id}"
+
+
+def anyscale_compute_tpl_url(compute_tpl_id: str):
+    return f"{GLOBAL_CONFIG['ANYSCALE_HOST']}" \
+           f"/o/anyscale-internal/configurations/cluster-computes" \
+           f"/{compute_tpl_id}"
+
+
+def anyscale_app_config_build_url(build_id: str):
+    return f"{GLOBAL_CONFIG['ANYSCALE_HOST']}" \
+           f"/o/anyscale-internal/configurations/app-config-details" \
+           f"/{build_id}"
+
+
 def wheel_url(ray_version, git_branch, git_commit):
     return f"https://s3-us-west-2.amazonaws.com/ray-wheels/" \
            f"{git_branch}/{git_commit}/" \
@@ -583,6 +607,8 @@ def wait_for_build_or_raise(sdk: AnyscaleSDK,
             continue
 
         if build.status == "succeeded":
+            logger.info(f"Link to app config build: "
+                        f"{anyscale_app_config_build_url(build_id)}")
             return build_id
 
     if last_status == "failed":
@@ -596,6 +622,8 @@ def wait_for_build_or_raise(sdk: AnyscaleSDK,
     start_wait = time.time()
     next_report = start_wait + REPORT_S
     logger.info(f"Waiting for build {build_id} to finish...")
+    logger.info(f"Track progress here: "
+                f"{anyscale_app_config_build_url(build_id)}")
     while not completed:
         now = time.time()
         if now > next_report:
@@ -607,15 +635,20 @@ def wait_for_build_or_raise(sdk: AnyscaleSDK,
         build = result.result
 
         if build.status == "failed":
-            raise RuntimeError("App config build failed.")
+            raise RuntimeError(
+                f"App config build failed. Please see "
+                f"{anyscale_app_config_build_url(build_id)} for details")
 
         if build.status == "succeeded":
+            logger.info("Build succeeded.")
             return build_id
 
         completed = build.status not in ["in_progress", "pending"]
 
         if completed:
-            raise RuntimeError(f"Unknown build status: {build.status}")
+            raise RuntimeError(
+                f"Unknown build status: {build.status}. Please see "
+                f"{anyscale_app_config_build_url(build_id)} for details")
 
         time.sleep(1)
 
@@ -653,6 +686,10 @@ def create_and_wait_for_session(
 
     # Trigger session start
     logger.info(f"Starting session {session_name} ({session_id})")
+    session_url = anyscale_session_url(
+        project_id=GLOBAL_CONFIG["ANYSCALE_PROJECT"], session_id=session_id)
+    logger.info(f"Link to session: {session_url}")
+
     result = sdk.start_session(session_id, start_session_options={})
     sop_id = result.result.id
     completed = result.result.completed
@@ -690,6 +727,9 @@ def run_session_command(sdk: AnyscaleSDK,
                         for k, v in env_vars.items()) + " " + cmd_to_run
 
     logger.info(f"Running command in session {session_id}: \n" f"{full_cmd}")
+    session_url = anyscale_session_url(
+        project_id=GLOBAL_CONFIG["ANYSCALE_PROJECT"], session_id=session_id)
+    logger.info(f"Link to session: {session_url}")
     result_queue.put(State(state_str, time.time(), None))
     result = sdk.create_session_command(
         dict(session_id=session_id, shell_command=full_cmd))
@@ -1075,6 +1115,10 @@ def run_test_config(
                     compute_tpl_id, compute_tpl_name = create_or_find_compute_template(
                         sdk, project_id, compute_tpl)
 
+                    logger.info(
+                        f"Link to compute template: {anyscale_compute_tpl_url(compute_tpl_id)}"
+                    )
+
                     # Find/create app config
                     app_config_id, app_config_name = create_or_find_app_config(
                         sdk, project_id, app_config)
@@ -1338,6 +1382,10 @@ def run_test_config(
             target=_check_progress, args=(logger, ))
 
     build_timeout = test_config["run"].get("build_timeout", 1800)
+
+    logger.info(
+        f"Link to project: {anyscale_project_url(project_id=GLOBAL_CONFIG['ANYSCALE_PROJECT'])}"
+    )
 
     msg = f"This will now run test {test_name}."
     if smoke_test:
