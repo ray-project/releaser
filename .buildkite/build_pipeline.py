@@ -112,6 +112,10 @@ MANUAL_TESTS = {
         "example_scripts_on_gpu_tests",
         "stress_tests",
     ],
+    "~/ray/release/nightly_tests/nightly_tests.yaml": [
+        "stress_test_many_tasks",
+        "stress_test_dead_actors",
+    ]
 }
 
 SUITES = {
