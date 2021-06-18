@@ -21,9 +21,6 @@ class SmokeTest(str):
 
 
 NIGHTLY_TESTS = {
-    "~/ray/release/horovod_tests/horovod_tests.yaml": [
-        SmokeTest("horovod_test"),
-    ],
     "~/ray/release/long_running_tests/long_running_tests.yaml": [
         SmokeTest("actor_deaths"),
         SmokeTest("apex"),
@@ -85,9 +82,9 @@ WEEKLY_TESTS = {
         "object_store",
         "distributed",
     ],
-    "~/ray/release/horovod_tests/horovod_tests.yaml": [
-        "horovod_test",
-    ],
+    # "~/ray/release/horovod_tests/horovod_tests.yaml": [
+    #     "horovod_test",
+    # ],
     # Full long running tests (1 day runtime)
     "~/ray/release/long_running_tests/long_running_tests.yaml": [
         "actor_deaths",
@@ -110,6 +107,9 @@ WEEKLY_TESTS = {
 }
 
 MANUAL_TESTS = {
+    "~/ray/release/horovod_tests/horovod_tests.yaml": [
+        SmokeTest("horovod_test"),
+    ],
     "~/ray/release/tune_tests/scalability_tests/tune_tests.yaml": [
         "durable_trainable",
     ],
