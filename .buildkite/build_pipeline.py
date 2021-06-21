@@ -82,6 +82,10 @@ WEEKLY_TESTS = {
         "object_store",
         "distributed",
     ],
+    "~/ray/release/nightly_tests/nightly_tests.yaml": [
+        "stress_test_many_tasks",
+        "stress_test_dead_actors",
+    ],
     # "~/ray/release/horovod_tests/horovod_tests.yaml": [
     #     "horovod_test",
     # ],
