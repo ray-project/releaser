@@ -590,6 +590,28 @@ def create_or_find_app_config(
     return app_config_id, app_config_name
 
 
+def install_app_config_packages(app_config: Dict[Any, Any]):
+    os.environ.update(app_config.get("env_vars", {}))
+    packages = app_config["python"]["pip_packages"]
+    for package in packages:
+        subprocess.check_output(["pip", "install", "-U", package], text=True)
+
+
+def install_matching_ray():
+    wheel = os.environ.get("RAY_WHEELS", None)
+    if not wheel:
+        return
+    assert "manylinux2014_x86_64" in wheel, wheel
+    if sys.platform == "darwin":
+        platform = "macosx_10_13_intel"
+    elif sys.platform == "win32":
+        platform = "win_amd64"
+    else:
+        platform = "manylinux2014_x86_64"
+    wheel = wheel.replace("manylinux2014_x86_64", platform)
+    subprocess.check_output(["pip", "install", "-U", wheel], text=True)
+
+
 def wait_for_build_or_raise(sdk: AnyscaleSDK,
                             app_config_id: Optional[str]) -> Optional[str]:
     if not app_config_id:
@@ -1002,6 +1024,12 @@ def run_test_config(
     # If a test is long running, timeout does not mean it failed
     is_long_running = test_config["run"].get("long_running", False)
 
+    if test_config["run"].get("use_connect"):
+        assert not kick_off_only, \
+            "Unsupported for running with Anyscale connect."
+        install_app_config_packages(app_config)
+        install_matching_ray()
+
     # Add information to results dict
     def _update_results(results: Dict):
         if "last_update" in results:
@@ -1147,8 +1175,6 @@ def run_test_config(
                     )
 
             if test_config["run"].get("use_connect"):
-                assert not kick_off_only, \
-                    "Unsupported for running with Anyscale connect."
                 assert compute_tpl_name, "Compute template must exist."
                 assert app_config_name, "Cluster environment must exist."
                 script_args = test_config["run"].get("args", [])
@@ -1623,7 +1649,6 @@ if __name__ == "__main__":
         commits = get_latest_commits(repo, branch)
         logger.info(f"Latest 10 commits for branch {branch}: {commits}")
         for commit in commits:
-            # TODO(mwtian): generate URL based on system?
             if wheel_exists(version, branch, commit):
                 url = wheel_url(version, branch, commit)
                 os.environ["RAY_WHEELS"] = url
