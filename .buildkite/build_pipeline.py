@@ -88,12 +88,17 @@ WEEKLY_TESTS = {
         "object_store",
         "distributed",
     ],
+    "~/ray/release/nightly_tests/nightly_tests.yaml": [
+        "stress_test_many_tasks",
+        "stress_test_dead_actors",
+    ],
     "~/ray/release/horovod_tests/horovod_tests.yaml": [
         "horovod_test",
     ],
     "~/ray/release/long_running_distributed_tests/long_running_distributed.yaml": [
         "pytorch_pbt_failure",
     ],
+>>>>>>> master
     # Full long running tests (1 day runtime)
     "~/ray/release/long_running_tests/long_running_tests.yaml": [
         "actor_deaths",
