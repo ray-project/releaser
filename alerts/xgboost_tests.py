@@ -15,7 +15,7 @@ def handle_result(created_on: datetime.datetime, category: str,
             "distributed_api_test", "ft_small_elastic", "ft_small_nonelastic"
     ]:
         if not status == "finished":
-            return "Test script did not finish successfully."
+            return f"Test script did not finish successfully ({status})."
 
         return None
     elif test_name.startswith("tune_"):

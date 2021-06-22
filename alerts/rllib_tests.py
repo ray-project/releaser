@@ -9,6 +9,6 @@ def handle_result(created_on: datetime.datetime, category: str,
     assert test_suite == "rllib_tests"
 
     if not status == "finished":
-        return "Test script did not finish successfully."
+        return f"Test script did not finish successfully ({status})."
 
     return None

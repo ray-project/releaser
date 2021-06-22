@@ -590,6 +590,28 @@ def create_or_find_app_config(
     return app_config_id, app_config_name
 
 
+def install_app_config_packages(app_config: Dict[Any, Any]):
+    os.environ.update(app_config.get("env_vars", {}))
+    packages = app_config["python"]["pip_packages"]
+    for package in packages:
+        subprocess.check_output(["pip", "install", "-U", package], text=True)
+
+
+def install_matching_ray():
+    wheel = os.environ.get("RAY_WHEELS", None)
+    if not wheel:
+        return
+    assert "manylinux2014_x86_64" in wheel, wheel
+    if sys.platform == "darwin":
+        platform = "macosx_10_13_intel"
+    elif sys.platform == "win32":
+        platform = "win_amd64"
+    else:
+        platform = "manylinux2014_x86_64"
+    wheel = wheel.replace("manylinux2014_x86_64", platform)
+    subprocess.check_output(["pip", "install", "-U", wheel], text=True)
+
+
 def wait_for_build_or_raise(sdk: AnyscaleSDK,
                             app_config_id: Optional[str]) -> Optional[str]:
     if not app_config_id:
@@ -657,7 +679,7 @@ def wait_for_build_or_raise(sdk: AnyscaleSDK,
 
 def run_job(cluster_name: str, compute_tpl_name: str, cluster_env_name: str,
             job_name: str, script: str, script_args: List[str],
-            env_vars: Dict[str, str]) -> subprocess.CompletedProcess:
+            env_vars: Dict[str, str]) -> Tuple[int, str]:
     # Start cluster and job
     address = f"anyscale://{cluster_name}?cluster_compute={compute_tpl_name}" \
               f"&cluster_env={cluster_env_name}&autosuspend=5&&update=True"
@@ -667,10 +689,17 @@ def run_job(cluster_name: str, compute_tpl_name: str, cluster_env_name: str,
     env.update(env_vars)
     env["RAY_ADDRESS"] = address
     env["RAY_JOB_NAME"] = job_name
-    # TODO(mwtian): stream captured output to terminal, and apply control
-    # sequences.
-    return subprocess.run(
-        script.split(" ") + script_args, env=env, capture_output=True)
+    proc = subprocess.Popen(
+        script.split(" ") + script_args, env=env,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT, text=True)
+    proc.stdout.reconfigure(line_buffering=True)
+    logs = ""
+    for line in proc.stdout:
+        logs += line
+        sys.stdout.write(line)
+    proc.wait()
+    return proc.returncode, logs
 
 
 def create_and_wait_for_session(
@@ -995,6 +1024,12 @@ def run_test_config(
     # If a test is long running, timeout does not mean it failed
     is_long_running = test_config["run"].get("long_running", False)
 
+    if test_config["run"].get("use_connect"):
+        assert not kick_off_only, \
+            "Unsupported for running with Anyscale connect."
+        install_app_config_packages(app_config)
+        install_matching_ray()
+
     # Add information to results dict
     def _update_results(results: Dict):
         if "last_update" in results:
@@ -1054,9 +1089,7 @@ def run_test_config(
 
     # When running the test script in client mode, the finish command is a
     # completed local process.
-    def _process_finished_client_command(proc: subprocess.CompletedProcess):
-        logs = f"stdout:\n{proc.stdout}\n\nstderr:\n{proc.stderr}\n"
-        print(logs)
+    def _process_finished_client_command(returncode: int, logs: str):
         saved_artifacts = pull_artifacts_and_store_in_cloud(
             temp_dir=temp_dir,
             logs=logs,  # Also save logs in cloud
@@ -1071,10 +1104,10 @@ def run_test_config(
             results = get_local_json_content(local_file=results_json, )
         else:
             results = {
-                "passed": int(proc.returncode == 0),
+                "passed": int(returncode == 0),
             }
 
-        results["returncode"]: proc.returncode
+        results["returncode"]: returncode
 
         _update_results(results)
 
@@ -1142,14 +1175,12 @@ def run_test_config(
                     )
 
             if test_config["run"].get("use_connect"):
-                assert not kick_off_only, \
-                    "Unsupported for running with Anyscale connect."
                 assert compute_tpl_name, "Compute template must exist."
                 assert app_config_name, "Cluster environment must exist."
                 script_args = test_config["run"].get("args", [])
                 if smoke_test:
                     script_args += ["--smoke-test"]
-                proc = run_job(
+                returncode, logs = run_job(
                     cluster_name=test_name,
                     compute_tpl_name=compute_tpl_name,
                     cluster_env_name=app_config_name,
@@ -1157,7 +1188,7 @@ def run_test_config(
                     script=test_config["run"]["script"],
                     script_args=script_args,
                     env_vars=env_vars)
-                _process_finished_client_command(proc)
+                _process_finished_client_command(returncode, logs)
                 return
 
             # Write test state json
@@ -1251,7 +1282,7 @@ def run_test_config(
             else:
                 result_queue.put(
                     State("END", time.time(), {
-                        "status": "error",
+                        "status": "timeout",
                         "last_logs": logs
                     }))
         finally:
@@ -1618,7 +1649,6 @@ if __name__ == "__main__":
         commits = get_latest_commits(repo, branch)
         logger.info(f"Latest 10 commits for branch {branch}: {commits}")
         for commit in commits:
-            # TODO(mwtian): generate URL based on system?
             if wheel_exists(version, branch, commit):
                 url = wheel_url(version, branch, commit)
                 os.environ["RAY_WHEELS"] = url
