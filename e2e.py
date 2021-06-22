@@ -1282,7 +1282,7 @@ def run_test_config(
             else:
                 result_queue.put(
                     State("END", time.time(), {
-                        "status": "error",
+                        "status": "timeout",
                         "last_logs": logs
                     }))
         finally:
