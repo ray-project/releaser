@@ -21,6 +21,9 @@ class SmokeTest(str):
 
 
 NIGHTLY_TESTS = {
+    # "~/ray/release/horovod_tests/horovod_tests.yaml": [
+    #     SmokeTest("horovod_test"),
+    # ],  # Should we enable this?
     "~/ray/release/long_running_tests/long_running_tests.yaml": [
         SmokeTest("actor_deaths"),
         SmokeTest("apex"),
@@ -51,12 +54,15 @@ NIGHTLY_TESTS = {
         "shuffle_1tb_large_partition",
         "dask_on_ray_large_scale_test_no_spilling",
         "dask_on_ray_large_scale_test_spilling",
+        "stress_test_many_tasks",
+        "stress_test_dead_actors",
     ],
     "~/ray/release/sgd_tests/sgd_tests.yaml": [
         "sgd_gpu",
     ],
     "~/ray/release/tune_tests/scalability_tests/tune_tests.yaml": [
         "bookkeeping_overhead",
+        "durable_trainable",
         SmokeTest("long_running_large_checkpoints"),
         SmokeTest("network_overhead"),
         "result_throughput_cluster",
@@ -82,9 +88,12 @@ WEEKLY_TESTS = {
         "object_store",
         "distributed",
     ],
-    # "~/ray/release/horovod_tests/horovod_tests.yaml": [
-    #     "horovod_test",
-    # ],
+    "~/ray/release/horovod_tests/horovod_tests.yaml": [
+        "horovod_test",
+    ],
+    "~/ray/release/long_running_distributed_tests/long_running_distributed.yaml": [
+        "pytorch_pbt_failure",
+    ],
     # Full long running tests (1 day runtime)
     "~/ray/release/long_running_tests/long_running_tests.yaml": [
         "actor_deaths",
@@ -107,21 +116,11 @@ WEEKLY_TESTS = {
 }
 
 MANUAL_TESTS = {
-    "~/ray/release/horovod_tests/horovod_tests.yaml": [
-        SmokeTest("horovod_test"),
-    ],
-    "~/ray/release/tune_tests/scalability_tests/tune_tests.yaml": [
-        "durable_trainable",
-    ],
     "~/ray/release/rllib_tests/rllib_tests.yaml": [
         "learning_tests",
         "example_scripts_on_gpu_tests",
         "stress_tests",
     ],
-    "~/ray/release/nightly_tests/nightly_tests.yaml": [
-        "stress_test_many_tasks",
-        "stress_test_dead_actors",
-    ]
 }
 
 SUITES = {
