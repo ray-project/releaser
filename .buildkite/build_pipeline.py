@@ -98,7 +98,6 @@ WEEKLY_TESTS = {
     "~/ray/release/long_running_distributed_tests/long_running_distributed.yaml": [
         "pytorch_pbt_failure",
     ],
->>>>>>> master
     # Full long running tests (1 day runtime)
     "~/ray/release/long_running_tests/long_running_tests.yaml": [
         "actor_deaths",
