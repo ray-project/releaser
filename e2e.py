@@ -609,6 +609,7 @@ def install_matching_ray():
     else:
         platform = "manylinux2014_x86_64"
     wheel = wheel.replace("manylinux2014_x86_64", platform)
+    subprocess.check_output(["pip", "uninstall", "-y", "ray"], text=True)
     subprocess.check_output(["pip", "install", "-U", wheel], text=True)
 
 
