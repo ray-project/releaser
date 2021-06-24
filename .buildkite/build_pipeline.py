@@ -54,8 +54,6 @@ NIGHTLY_TESTS = {
         "shuffle_1tb_large_partition",
         "dask_on_ray_large_scale_test_no_spilling",
         "dask_on_ray_large_scale_test_spilling",
-        "stress_test_many_tasks",
-        "stress_test_dead_actors",
     ],
     "~/ray/release/sgd_tests/sgd_tests.yaml": [
         "sgd_gpu",
