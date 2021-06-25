@@ -124,6 +124,10 @@ MANUAL_TESTS = {
         "example_scripts_on_gpu_tests",
         "stress_tests",
     ],
+    "~/ray/release/long_running_tests/long_running_tests.yaml": [
+        SmokeTest("serve"),
+        SmokeTest("serve_failure"),
+    ]
 }
 
 SUITES = {
