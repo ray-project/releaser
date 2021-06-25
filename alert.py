@@ -29,7 +29,7 @@ SUITE_TO_FN = {
 GLOBAL_CONFIG["RELEASE_AWS_DB_STATE_TABLE"] = "alert_state"
 GLOBAL_CONFIG["SLACK_WEBHOOK"] = os.environ.get("SLACK_WEBHOOK", "")
 GLOBAL_CONFIG["SLACK_CHANNEL"] = os.environ.get("SLACK_CHANNEL",
-                                                "#kai-bot-test")
+                                                "#oss-test-cop")
 
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
