@@ -679,7 +679,7 @@ def wait_for_build_or_raise(sdk: AnyscaleSDK,
 
 
 def run_job(cluster_name: str, compute_tpl_name: str, cluster_env_name: str,
-            job_name: str, script: str, script_args: List[str],
+            job_name: str, min_workers: str, script: str, script_args: List[str],
             env_vars: Dict[str, str]) -> Tuple[int, str]:
     # Start cluster and job
     address = f"anyscale://{cluster_name}?cluster_compute={compute_tpl_name}" \
@@ -690,6 +690,7 @@ def run_job(cluster_name: str, compute_tpl_name: str, cluster_env_name: str,
     env.update(env_vars)
     env["RAY_ADDRESS"] = address
     env["RAY_JOB_NAME"] = job_name
+    env["RAY_RELEASE_MIN_WORKERS"] = str(min_workers)
     proc = subprocess.Popen(
         script.split(" ") + script_args, env=env,
         stdout=subprocess.PIPE,
@@ -1181,11 +1182,15 @@ def run_test_config(
                 script_args = test_config["run"].get("args", [])
                 if smoke_test:
                     script_args += ["--smoke-test"]
+                min_workers = 0
+                for node_type in compute_tpl["worker_node_types"]:
+                    min_workers += node_type["min_workers"]
                 returncode, logs = run_job(
                     cluster_name=test_name,
                     compute_tpl_name=compute_tpl_name,
                     cluster_env_name=app_config_name,
                     job_name=session_name,
+                    min_workers=min_workers,
                     script=test_config["run"]["script"],
                     script_args=script_args,
                     env_vars=env_vars)
