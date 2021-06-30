@@ -6,3 +6,4 @@ ray
 .mypy_cache
 .vscode
 .env
+.idea
