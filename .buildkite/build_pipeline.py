@@ -52,7 +52,6 @@ NIGHTLY_TESTS = {
     "~/ray/benchmarks/benchmark_tests.yaml": [
         "single_node",
         "object_store",
-        "distributed",
     ],
     "~/ray/release/long_running_tests/long_running_tests.yaml": [
         SmokeTest("actor_deaths"),
