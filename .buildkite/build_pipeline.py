@@ -49,6 +49,11 @@ NIGHTLY_TESTS = {
         "modin_xgboost_test",
         "torch_tune_serve_test",
     ],
+    "~/ray/benchmarks/benchmark_tests.yaml": [
+        "single_node",
+        "object_store",
+        "distributed",
+    ],
     "~/ray/release/long_running_tests/long_running_tests.yaml": [
         SmokeTest("actor_deaths"),
         SmokeTest("apex"),
@@ -96,8 +101,6 @@ NIGHTLY_TESTS = {
 
 WEEKLY_TESTS = {
     "~/ray/benchmarks/benchmark_tests.yaml": [
-        "single_node",
-        "object_store",
         "distributed",
     ],
     "~/ray/release/nightly_tests/nightly_tests.yaml": [
