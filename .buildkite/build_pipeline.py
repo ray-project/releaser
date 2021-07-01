@@ -16,8 +16,32 @@ import yaml
 # RELEASE_TEST_SUITE Release test suite (e.g. manual, nightly)
 
 
-class SmokeTest(str):
-    pass
+class ReleaseTest:
+    def __init__(self, name: str, smoke_test: bool = False, retry: int = 0):
+        self.name = name
+        self.smoke_test = smoke_test
+        self.retry = retry
+
+    def __str__(self):
+        return self.name
+
+    def __repr__(self):
+        return self.name
+
+    def __contains__(self, item):
+        return self.name.__contains__(item)
+
+    def __iter__(self):
+        return iter(self.name)
+
+    def __len__(self):
+        return len(self.name)
+
+
+class SmokeTest(ReleaseTest):
+    def __init__(self, name: str, retry: int = 0):
+        super(SmokeTest, self).__init__(
+            name=name, smoke_test=True, retry=retry)
 
 
 NIGHTLY_TESTS = {
@@ -47,19 +71,19 @@ NIGHTLY_TESTS = {
         "microbenchmark",
     ],
     "~/ray/release/nightly_tests/nightly_tests.yaml": [
-        "shuffle_10gb",
-        "shuffle_50gb",
-        "shuffle_50gb_large_partition",
-        "shuffle_100gb",
-        "non_streaming_shuffle_100gb",
-        "non_streaming_shuffle_50gb_large_partition",
-        "non_streaming_shuffle_50gb",
-        "dask_on_ray_10gb_sort",
-        "dask_on_ray_100gb_sort",
-        "shuffle_1tb_large_partition",
-        "dask_on_ray_large_scale_test_no_spilling",
-        "dask_on_ray_large_scale_test_spilling",
-        "stress_test_placement_group",
+        ReleaseTest("shuffle_10gb", retry=3),
+        ReleaseTest("shuffle_50gb", retry=3),
+        ReleaseTest("shuffle_50gb_large_partition", retry=3),
+        ReleaseTest("shuffle_100gb", retry=3),
+        ReleaseTest("non_streaming_shuffle_100gb", retry=3),
+        ReleaseTest("non_streaming_shuffle_50gb_large_partition", retry=3),
+        ReleaseTest("non_streaming_shuffle_50gb", retry=3),
+        ReleaseTest("dask_on_ray_10gb_sort", retry=3),
+        ReleaseTest("dask_on_ray_100gb_sort", retry=3),
+        ReleaseTest("shuffle_1tb_large_partition", retry=3),
+        ReleaseTest("dask_on_ray_large_scale_test_no_spilling", retry=3),
+        ReleaseTest("dask_on_ray_large_scale_test_spilling", retry=3),
+        ReleaseTest("stress_test_placement_group", retry=3),
     ],
     "~/ray/release/sgd_tests/sgd_tests.yaml": [
         "sgd_gpu",
@@ -122,7 +146,7 @@ WEEKLY_TESTS = {
         "long_running_large_checkpoints",
     ],
 }
-    
+
 MANUAL_TESTS = {
     "~/ray/release/rllib_tests/rllib_tests.yaml": [
         "learning_tests",
@@ -198,9 +222,10 @@ def build_pipeline(steps):
             if FILTER_TEST and FILTER_TEST not in test_name:
                 continue
 
-            logging.info(f"Adding test: {test_base}/{test_name}")
+            if not isinstance(test_name, ReleaseTest):
+                test_name = ReleaseTest(name=test_name)
 
-            step_conf = copy.deepcopy(DEFAULT_STEP_TEMPLATE)
+            logging.info(f"Adding test: {test_base}/{test_name}")
 
             cmd = str(f"python e2e.py "
                       f"--ray-branch {RAY_BRANCH} "
@@ -208,9 +233,21 @@ def build_pipeline(steps):
                       f"--test-config {test_file} "
                       f"--test-name {test_name}")
 
-            if isinstance(test_name, SmokeTest):
+            if test_name.smoke_test:
                 logging.info("This test will run as a smoke test.")
                 cmd += " --smoke-test"
+
+            step_conf = copy.deepcopy(DEFAULT_STEP_TEMPLATE)
+
+            if test_name.retry:
+                logging.info(f"This test will be retried up to "
+                             f"{test_name.retry} times.")
+                step_conf["retry"] = {
+                    "automatic": [{
+                        "exit_status": "*",
+                        "limit": test_name.retry
+                    }]
+                }
 
             step_conf["commands"] = [
                 "pip install -q -r requirements.txt",
