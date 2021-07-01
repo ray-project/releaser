@@ -19,27 +19,6 @@ import yaml
 class SmokeTest(str):
     pass
 
-# These tests are running 4 times a day.
-# This is a temporary way to increase the data point when things are failing.
-# We should retry when things are failing instead if we want to do this in a
-# right way.
-DAILY_MULTIPLE_TESTS = {
-    "~/ray/release/nightly_tests/nightly_tests.yaml": [
-        "shuffle_10gb",
-        "shuffle_50gb",
-        "shuffle_50gb_large_partition",
-        "shuffle_100gb",
-        "non_streaming_shuffle_100gb",
-        "non_streaming_shuffle_50gb_large_partition",
-        "non_streaming_shuffle_50gb",
-        "dask_on_ray_10gb_sort",
-        "dask_on_ray_100gb_sort",
-        "dask_on_ray_large_scale_test_no_spilling",
-        "dask_on_ray_large_scale_test_spilling",
-        "stress_test_placement_group",
-    ],
-}
-
 NIGHTLY_TESTS = {
     # "~/ray/release/horovod_tests/horovod_tests.yaml": [
     #     SmokeTest("horovod_test"),
@@ -71,6 +50,18 @@ NIGHTLY_TESTS = {
         "microbenchmark",
     ],
     "~/ray/release/nightly_tests/nightly_tests.yaml": [
+        "shuffle_10gb",
+        "shuffle_50gb",
+        "shuffle_50gb_large_partition",
+        "shuffle_100gb",
+        "non_streaming_shuffle_100gb",
+        "non_streaming_shuffle_50gb_large_partition",
+        "non_streaming_shuffle_50gb",
+        "dask_on_ray_10gb_sort",
+        "dask_on_ray_100gb_sort",
+        "dask_on_ray_large_scale_test_no_spilling",
+        "dask_on_ray_large_scale_test_spilling",
+        "stress_test_placement_group",
         "shuffle_1tb_large_partition",
     ],
     "~/ray/release/sgd_tests/sgd_tests.yaml": [
@@ -146,7 +137,6 @@ MANUAL_TESTS = {
 }
 
 SUITES = {
-    "daily_multiple": DAILY_MULTIPLE_TESTS,
     "nightly": NIGHTLY_TESTS,
     "weekly": WEEKLY_TESTS,
     "manual": MANUAL_TESTS,
