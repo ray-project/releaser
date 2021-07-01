@@ -244,6 +244,7 @@ def build_pipeline(steps):
                              f"{test_name.retry} times.")
                 step_conf["retry"] = {
                     "automatic": [{
+                        "exit_status": "*",
                         "limit": test_name.retry
                     }]
                 }
