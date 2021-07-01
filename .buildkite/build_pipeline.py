@@ -43,7 +43,6 @@ class SmokeTest(ReleaseTest):
         super(SmokeTest, self).__init__(
             name=name, smoke_test=True, retry=retry)
 
-
 NIGHTLY_TESTS = {
     # "~/ray/release/horovod_tests/horovod_tests.yaml": [
     #     SmokeTest("horovod_test"),
@@ -52,6 +51,10 @@ NIGHTLY_TESTS = {
         "dask_xgboost_test",
         "modin_xgboost_test",
         "torch_tune_serve_test",
+    ],
+    "~/ray/benchmarks/benchmark_tests.yaml": [
+        ReleaseTest("single_node", retry=3),
+        ReleaseTest("object_store", retry=3),
     ],
     "~/ray/release/long_running_tests/long_running_tests.yaml": [
         SmokeTest("actor_deaths"),
@@ -112,8 +115,6 @@ NIGHTLY_TESTS = {
 
 WEEKLY_TESTS = {
     "~/ray/benchmarks/benchmark_tests.yaml": [
-        "single_node",
-        "object_store",
         "distributed",
     ],
     "~/ray/release/nightly_tests/nightly_tests.yaml": [
