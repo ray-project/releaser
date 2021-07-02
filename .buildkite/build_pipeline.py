@@ -84,6 +84,8 @@ NIGHTLY_TESTS = {
         ReleaseTest("dask_on_ray_large_scale_test_no_spilling", retry=3),
         ReleaseTest("dask_on_ray_large_scale_test_spilling", retry=3),
         ReleaseTest("stress_test_placement_group", retry=3),
+        SmokeTest("stress_test_many_tasks"),
+        SmokeTest("stress_test_dead_actors"),
     ],
     "~/ray/release/sgd_tests/sgd_tests.yaml": [
         "sgd_gpu",
