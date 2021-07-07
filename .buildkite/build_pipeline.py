@@ -43,6 +43,37 @@ class SmokeTest(ReleaseTest):
         super(SmokeTest, self).__init__(
             name=name, smoke_test=True, retry=retry)
 
+CORE_NIGHTLY_TESTS = {
+    "~/ray/release/nightly_tests/nightly_tests.yaml": [
+        "shuffle_10gb",
+        "shuffle_50gb",
+        "shuffle_50gb_large_partition",
+        "shuffle_100gb",
+        "non_streaming_shuffle_100gb",
+        "non_streaming_shuffle_50gb_large_partition",
+        "non_streaming_shuffle_50gb",
+        "dask_on_ray_10gb_sort",
+        "dask_on_ray_100gb_sort",
+        "shuffle_1tb_large_partition",
+        "dask_on_ray_large_scale_test_no_spilling",
+        "dask_on_ray_large_scale_test_spilling",
+        "stress_test_placement_group",
+        "streaming_shuffle_1tb_100_partitions",
+        "non_streaming_shuffle_1tb_100_partitions",
+        "shuffle_1tb_1000_partition",
+        "non_streaming_shuffle_1tb_1000_partition",
+        "shuffle_1tb_5000_partitions",
+        "non_streaming_shuffle_1tb_5000_partitions",
+        "decision_tree_autoscaling",
+        SmokeTest("stress_test_many_tasks"),
+        SmokeTest("stress_test_dead_actors"),
+    ],
+    "~/ray/benchmarks/benchmark_tests.yaml": [
+        "single_node",
+        "object_store",
+    ],
+}
+
 NIGHTLY_TESTS = {
     # "~/ray/release/horovod_tests/horovod_tests.yaml": [
     #     SmokeTest("horovod_test"),
@@ -51,10 +82,6 @@ NIGHTLY_TESTS = {
         "dask_xgboost_test",
         "modin_xgboost_test",
         "torch_tune_serve_test",
-    ],
-    "~/ray/benchmarks/benchmark_tests.yaml": [
-        ReleaseTest("single_node", retry=3),
-        ReleaseTest("object_store", retry=3),
     ],
     "~/ray/release/long_running_tests/long_running_tests.yaml": [
         SmokeTest("actor_deaths"),
@@ -72,30 +99,6 @@ NIGHTLY_TESTS = {
     ],
     "~/ray/release/microbenchmark/microbenchmark.yaml": [
         "microbenchmark",
-    ],
-    "~/ray/release/nightly_tests/nightly_tests.yaml": [
-        ReleaseTest("shuffle_10gb", retry=3),
-        ReleaseTest("shuffle_50gb", retry=3),
-        ReleaseTest("shuffle_50gb_large_partition", retry=3),
-        ReleaseTest("shuffle_100gb", retry=3),
-        ReleaseTest("non_streaming_shuffle_100gb", retry=3),
-        ReleaseTest("non_streaming_shuffle_50gb_large_partition", retry=3),
-        ReleaseTest("non_streaming_shuffle_50gb", retry=3),
-        ReleaseTest("dask_on_ray_10gb_sort", retry=3),
-        ReleaseTest("dask_on_ray_100gb_sort", retry=3),
-        ReleaseTest("shuffle_1tb_large_partition", retry=3),
-        ReleaseTest("dask_on_ray_large_scale_test_no_spilling", retry=3),
-        ReleaseTest("dask_on_ray_large_scale_test_spilling", retry=3),
-        ReleaseTest("stress_test_placement_group", retry=3),
-        ReleaseTest("streaming_shuffle_1tb_100_partitions", retry=3),
-        ReleaseTest("non_streaming_shuffle_1tb_100_partitions", retry=3),
-        ReleaseTest("shuffle_1tb_1000_partition", retry=3),
-        ReleaseTest("non_streaming_shuffle_1tb_1000_partition", retry=3),
-        ReleaseTest("shuffle_1tb_5000_partitions", retry=3),
-        ReleaseTest("non_streaming_shuffle_1tb_5000_partitions", retry=3),
-        ReleaseTest("decision_tree_autoscaling", retry=3),
-        SmokeTest("stress_test_many_tasks"),
-        SmokeTest("stress_test_dead_actors"),
     ],
     "~/ray/release/sgd_tests/sgd_tests.yaml": [
         "sgd_gpu",
@@ -170,6 +173,7 @@ MANUAL_TESTS = {
 }
 
 SUITES = {
+    "core-nightly": CORE_NIGHTLY_TESTS,
     "nightly": NIGHTLY_TESTS,
     "weekly": WEEKLY_TESTS,
     "manual": MANUAL_TESTS,
