@@ -267,8 +267,8 @@ def build_pipeline(steps):
                 cmd,
             ]
 
-            step_conf["label"] = f"({RAY_BRANCH}) " \
-                                 f"{RAY_TEST_BRANCH}/{test_base}: {test_name}"
+            step_conf["label"] = f"{test_name} ({RAY_BRANCH}) - " \
+                                 f"{RAY_TEST_BRANCH}/{test_base}"
             all_steps.append(step_conf)
 
     return all_steps
