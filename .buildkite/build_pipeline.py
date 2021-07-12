@@ -62,6 +62,7 @@ CORE_NIGHTLY_TESTS = {
         "shuffle_1tb_5000_partitions",
         "non_streaming_shuffle_1tb_5000_partitions",
         "decision_tree_autoscaling",
+        "autoscaling_shuffle_1tb_1000_partitions",
         SmokeTest("stress_test_many_tasks"),
         SmokeTest("stress_test_dead_actors"),
     ],
