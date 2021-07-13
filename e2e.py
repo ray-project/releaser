@@ -1110,15 +1110,20 @@ def run_test_config(
     # When running the test script in client mode, the finish command is a
     # completed local process.
     def _process_finished_client_command(returncode: int, logs: str):
-        saved_artifacts = pull_artifacts_and_store_in_cloud(
-            temp_dir=temp_dir,
-            logs=logs,  # Also save logs in cloud
-            session_name=session_name,
-            test_name=test_name,
-            artifacts=None,
-            session_controller=None,
-        )
-        logger.info("Stored results on the cloud. Returning.")
+        if upload_artifacts:
+            saved_artifacts = pull_artifacts_and_store_in_cloud(
+                temp_dir=temp_dir,
+                logs=logs,  # Also save logs in cloud
+                session_name=session_name,
+                test_name=test_name,
+                artifacts=None,
+                session_controller=None,
+            )
+            logger.info("Stored results on the cloud. Returning.")
+        else:
+            saved_artifacts = {}
+            logger.info("Usually I would have fetched the results and "
+                        "artifacts and stored them on S3.")
 
         if results_json:
             results = get_local_json_content(local_file=results_json, )
