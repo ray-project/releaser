@@ -327,6 +327,21 @@ def get_latest_commits(repo: str, branch: str = "master") -> List[str]:
     return commits
 
 
+def find_ray_wheels(repo: str, branch: str, version: str):
+    url = None
+    commits = get_latest_commits(repo, branch)
+    logger.info(f"Latest 10 commits for branch {branch}: {commits}")
+    for commit in commits:
+        if wheel_exists(version, branch, commit):
+            url = wheel_url(version, branch, commit)
+            os.environ["RAY_WHEELS"] = url
+            logger.info(
+                f"Found wheels URL for Ray {version}, branch {branch}: "
+                f"{url}")
+            break
+    return url
+
+
 def _check_stop(stop_event: multiprocessing.Event):
     if stop_event.is_set():
         raise ReleaseTestTimeoutError("Process timed out.")
@@ -679,7 +694,8 @@ def wait_for_build_or_raise(sdk: AnyscaleSDK,
 
 
 def run_job(cluster_name: str, compute_tpl_name: str, cluster_env_name: str,
-            job_name: str, min_workers: str, script: str, script_args: List[str],
+            job_name: str, min_workers: str, script: str,
+            script_args: List[str],
             env_vars: Dict[str, str]) -> Tuple[int, str]:
     # Start cluster and job
     address = f"anyscale://{cluster_name}?cluster_compute={compute_tpl_name}" \
@@ -692,9 +708,11 @@ def run_job(cluster_name: str, compute_tpl_name: str, cluster_env_name: str,
     env["RAY_JOB_NAME"] = job_name
     env["RAY_RELEASE_MIN_WORKERS"] = str(min_workers)
     proc = subprocess.Popen(
-        script.split(" ") + script_args, env=env,
+        script.split(" ") + script_args,
+        env=env,
         stdout=subprocess.PIPE,
-        stderr=subprocess.STDOUT, text=True)
+        stderr=subprocess.STDOUT,
+        text=True)
     proc.stdout.reconfigure(line_buffering=True)
     logs = ""
     for line in proc.stdout:
@@ -1647,24 +1665,15 @@ if __name__ == "__main__":
     if args.ray_wheels:
         os.environ["RAY_WHEELS"] = str(args.ray_wheels)
     elif not args.check:
-        version = GLOBAL_CONFIG["RAY_VERSION"]
-        repo = GLOBAL_CONFIG["RAY_REPO"]
-        branch = GLOBAL_CONFIG["RAY_BRANCH"]
-
-        url = None
-        commits = get_latest_commits(repo, branch)
-        logger.info(f"Latest 10 commits for branch {branch}: {commits}")
-        for commit in commits:
-            if wheel_exists(version, branch, commit):
-                url = wheel_url(version, branch, commit)
-                os.environ["RAY_WHEELS"] = url
-                logger.info(
-                    f"Found wheels URL for Ray {version}, branch {branch}: "
-                    f"{url}")
-                break
+        url = find_ray_wheels(
+            GLOBAL_CONFIG["RAY_REPO"],
+            GLOBAL_CONFIG["RAY_BRANCH"],
+            GLOBAL_CONFIG["RAY_VERSION"],
+        )
         if not url:
-            raise RuntimeError(
-                f"Could not find wheels for Ray {version}, branch {branch}")
+            raise RuntimeError(f"Could not find wheels for "
+                               f"Ray {GLOBAL_CONFIG['RAY_VERSION']}, "
+                               f"branch {GLOBAL_CONFIG['RAY_BRANCH']}")
 
     test_config_file = os.path.abspath(os.path.expanduser(args.test_config))
 
