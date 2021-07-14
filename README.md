@@ -1,3 +1,11 @@
+# Deprecated!
+
+This repository has been deprecated. The relevant
+release testing scripts have been moved to the 
+Ray core repo [with this PR](https://github.com/ray-project/ray/pull/17070).
+
+**Please do not file any PRs or push to master on this repository!**
+
 # Releaser
 
 Releaser is a command line tool that runs Ray release tests. It uses Github Action to schedule periodic runs and kick off the tests on Ansycale.
